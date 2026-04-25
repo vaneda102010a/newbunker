@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Генератор паков для игры Бункер</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page">
+    <header class="top-header">
+      <div class="title-block">
+        <h1>Генератор паков для игры Бункер</h1>
+        <p>Выбери тему, настрой параметры и получи уникальный пак карточек</p>
+      </div>
+
+      <nav class="header-actions" aria-label="Быстрые действия">
+        <button class="icon-button" type="button" aria-label="Тема">☼</button>
+        <button class="icon-button" type="button" aria-label="Помощь">?</button>
+        <button class="icon-button" type="button" aria-label="Профиль">○</button>
+      </nav>
+    </header>
+
+    <section class="room-panel info-panel" id="roomPanel" aria-label="Комната">
+      <div class="room-start">
+        <span class="eyebrow">Онлайн</span>
+        <h2>Комната игры</h2>
+        <p>Создай комнату или присоединись по коду, чтобы все видели один общий пак.</p>
+      </div>
+
+      <div class="room-actions">
+        <label class="field">
+          <span>Имя</span>
+          <input id="roomNameInput" type="text" placeholder="Ваше имя">
+        </label>
+
+        <button class="main-button" id="createRoomButton" type="button">Создать комнату</button>
+      </div>
+
+      <div class="room-join">
+        <label class="field">
+          <span>Код комнаты</span>
+          <input id="roomCodeInput" type="text" placeholder="AB12CD" maxlength="6">
+        </label>
+
+        <button class="secondary-button" id="joinRoomButton" type="button">Присоединиться к комнате</button>
+      </div>
+
+      <div class="room-info" id="roomInfo" hidden>
+        <div>
+          <span class="eyebrow">Код комнаты</span>
+          <strong id="roomCodeDisplay">------</strong>
+        </div>
+        <div>
+          <span class="eyebrow">Ссылка</span>
+          <a id="roomInviteLink" href="#" target="_blank" rel="noreferrer">Пригласить игроков</a>
+        </div>
+        <ul class="room-player-list" id="roomPlayersList"></ul>
+      </div>
+    </section>
+
+    <section class="role-panel info-panel" id="rolePanel" aria-label="Выбор роли">
+      <div class="role-copy">
+        <span class="eyebrow">Роль</span>
+        <h2>Выберите режим</h2>
+      </div>
+
+      <div class="role-actions" role="group" aria-label="Роль в игре">
+        <button class="role-button" id="hostRoleButton" type="button" data-role="host">Я ведущий</button>
+        <button class="role-button" id="playerRoleButton" type="button" data-role="player">Я игрок</button>
+      </div>
+
+      <div class="player-setup" id="playerSetup" hidden>
+        <label class="field">
+          <span>Номер игрока</span>
+          <select id="playerNumberSelect"></select>
+        </label>
+
+        <label class="field">
+          <span>Имя игрока</span>
+          <input id="playerNameInput" type="text" placeholder="Игрок">
+        </label>
+      </div>
+    </section>
+
+    <section class="control-panel" aria-label="Настройки пака">
+      <label class="field">
+        <span>Тема</span>
+        <select id="themeSelect">
+          <option>Киберпанк</option>
+          <option>Катаклизм</option>
+          <option>Зомби</option>
+          <option>Космос</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Количество игроков</span>
+        <select id="playerCountSelect">
+          <option selected>6</option>
+          <option>4</option>
+          <option>5</option>
+          <option>7</option>
+          <option>8</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Стиль</span>
+        <select id="styleSelect">
+          <option selected>Смешной</option>
+          <option>Реалистичный</option>
+          <option>Темный</option>
+          <option>Абсурдный</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Уровень жести</span>
+        <select id="difficultySelect">
+          <option selected>Средний</option>
+          <option>Легкий</option>
+          <option>Жесткий</option>
+        </select>
+      </label>
+
+      <div class="generate-box">
+        <button class="main-button" id="generateButton" type="button">Сгенерировать пак</button>
+        <button class="secondary-button" id="randomThemeButton" type="button">Случайная тема</button>
+      </div>
+    </section>
+
+    <div class="status-message" id="statusMessage" role="status" aria-live="polite"></div>
+
+    <main class="content">
+      <section class="pack-heading">
+        <h2>Сгенерированный пак</h2>
+      </section>
+
+      <section class="overview-panel info-panel" aria-label="Информация игры">
+        <article class="overview-column" id="catastrophe" aria-label="Катастрофа">
+          <span class="eyebrow">Катастрофа</span>
+          <h3 id="catastropheTabTitle">ИИ мэра города взломал систему</h3>
+          <div class="pack-details" id="catastropheTabText">Искусственный интеллект, управлявший городом, решил, что люди слишком шумные и неэффективные. Началась тотальная зачистка.</div>
+        </article>
+
+        <article class="overview-column" id="bunker" aria-label="Бункер">
+          <span class="eyebrow">Бункер</span>
+          <h3>Подземный техно-бункер</h3>
+          <div class="pack-details" id="bunkerTabText">Шесть мест, слабая вентиляция, запас еды на месяц и серверная, которая иногда разговаривает сама с собой.</div>
+        </article>
+      </section>
+
+      <section class="game-log-panel info-panel" aria-label="Журнал игры">
+        <div class="game-log-header">
+          <span class="eyebrow">Локально</span>
+          <h3>Журнал игры</h3>
+        </div>
+        <ul class="game-log-list" id="gameLogList" aria-live="polite">
+          <li class="log-empty">Действий пока нет</li>
+        </ul>
+      </section>
+
+      <section class="characters-section" id="characters" aria-label="Персонажи">
+        <div class="character-grid" id="characterGrid"></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="confirmModal" hidden>
+    <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+      <h3 id="confirmTitle">Подтверждение</h3>
+      <p id="confirmMessage">Открыть характеристику?</p>
+      <div class="modal-actions">
+        <button class="main-button" id="confirmYesButton" type="button">Да</button>
+        <button class="ghost-button" id="confirmNoButton" type="button">Нет</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="abilityModal" hidden>
+    <div class="confirm-modal ability-modal" role="dialog" aria-modal="true" aria-labelledby="abilityTitle">
+      <span class="eyebrow" id="abilityPlayerLabel">Игрок</span>
+      <h3 id="abilityTitle">Способность</h3>
+      <p id="abilityDescription">Описание способности</p>
+
+      <label class="field modal-field" id="abilityTargetField" hidden>
+        <span>Цель</span>
+        <select id="abilityTargetSelect"></select>
+      </label>
+
+      <p class="ability-target-hint" id="abilityTargetHint" hidden></p>
+
+      <label class="field modal-field" id="abilityTraitField" hidden>
+        <span>Характеристика</span>
+        <select id="abilityTraitSelect"></select>
+      </label>
+
+      <p class="ability-admin-note" id="abilityAdminNote"></p>
+
+      <div class="modal-actions">
+        <button class="main-button" id="abilityConfirmButton" type="button">Подтвердить</button>
+        <button class="ghost-button" id="abilityCancelButton" type="button">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="data.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
