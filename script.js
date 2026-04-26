@@ -20,6 +20,21 @@ const characterTraits = [
   { key: "specialAbility", label: "Способн." }
 ];
 
+const tableTraits = [
+  { key: "gender", label: "Пол" },
+  { key: "bodyType", label: "Тип тела" },
+  { key: "trait", label: "Черта" },
+  { key: "age", label: "Возраст" },
+  { key: "profession", label: "Профессия" },
+  { key: "health", label: "Здоровье" },
+  { key: "hobby", label: "Хобби" },
+  { key: "phobia", label: "Фобия" },
+  { key: "largeInventory", label: "Крупное" },
+  { key: "backpack", label: "Рюкзак" },
+  { key: "additionalInfo", label: "Инфо" },
+  { key: "specialAbility", label: "Способность" }
+];
+
 const traitIcons = {
   gender: "👤",
   bodyType: "▣",
@@ -953,13 +968,13 @@ function renderPlayersTable(characters) {
       <colgroup>
         <col class="players-table-number-col">
         <col class="players-table-player-col">
-        ${characterTraits.map((trait) => `<col class="players-table-data-col players-table-${trait.key}-col">`).join("")}
+        ${tableTraits.map((trait) => `<col class="players-table-data-col players-table-${trait.key}-col">`).join("")}
       </colgroup>
       <thead>
         <tr>
           <th scope="col">#</th>
           <th scope="col">Игрок</th>
-          ${characterTraits.map((trait) => `<th scope="col">${trait.label}</th>`).join("")}
+          ${tableTraits.map((trait) => `<th scope="col">${trait.label}</th>`).join("")}
         </tr>
       </thead>
       <tbody>
@@ -980,7 +995,7 @@ function renderPlayerTableRow(character, gameIsOver) {
     <tr class="${isExcluded ? "excluded" : ""}${isOwn ? " own-row" : ""}" style="--accent: ${character.accent}">
       <th class="players-table-number" scope="row">${character.number}</th>
       <td class="players-table-player" title="${escapeHtml(playerTitle)}">${renderPlayerTableSlot(character, isExcluded, gameIsOver)}</td>
-      ${characterTraits.map((trait) => `
+      ${tableTraits.map((trait) => `
         <td class="players-table-cell trait-${trait.key}" title="${escapeHtml(getTableTraitTitle(character, trait))}">
           ${renderTraitValue(character, trait)}
         </td>
