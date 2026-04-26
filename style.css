@@ -509,6 +509,9 @@ button:focus-visible {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 0;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
   overflow: hidden;
   padding: 0;
   border-radius: 16px;
@@ -576,6 +579,9 @@ button:focus-visible {
   grid-template-columns: 1fr;
   gap: 12px;
   align-items: start;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
   padding: 18px 20px;
   border-radius: 16px;
 }
@@ -619,11 +625,11 @@ button:focus-visible {
 
 .character-grid {
   width: 100%;
-  max-width: 1480px;
+  max-width: 1800px;
   min-width: 0;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(8, minmax(120px, 1fr));
+  grid-template-columns: repeat(6, minmax(150px, 1fr));
   justify-content: center;
   gap: 12px;
   align-items: start;
@@ -637,9 +643,10 @@ button:focus-visible {
 
 .players-table-wrap {
   width: 100%;
-  max-width: 100%;
+  max-width: 1800px;
   min-width: 0;
-  overflow-x: auto;
+  margin: 0 auto;
+  overflow-x: hidden;
   overflow-y: visible;
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -653,41 +660,40 @@ button:focus-visible {
 
 .players-table {
   width: 100%;
-  min-width: 1480px;
   table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
   color: rgba(245, 245, 247, 0.88);
-  font-size: 12px;
-  line-height: 1.35;
+  font-size: 11px;
+  line-height: 1.25;
 }
 
 .players-table-number-col {
-  width: 48px;
+  width: 42px;
 }
 
 .players-table-player-col {
-  width: 148px;
+  width: 150px;
 }
 
 .players-table-trait-col {
-  width: 108px;
+  width: auto;
 }
 
 .players-table-specialAbility-col {
-  width: 168px;
+  width: auto;
 }
 
 .players-table th,
 .players-table td {
   min-width: 0;
-  padding: 10px;
+  padding: 8px 7px;
   border-right: 1px solid rgba(255, 255, 255, 0.055);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   vertical-align: top;
-  overflow-wrap: break-word;
-  word-break: normal;
-  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .players-table th:last-child,
@@ -755,16 +761,8 @@ button:focus-visible {
 }
 
 .players-table-player {
-  position: sticky;
-  left: 48px;
-  z-index: 2;
   background: rgba(24, 24, 27, 0.94);
   box-shadow: 1px 0 0 rgba(255, 255, 255, 0.055);
-}
-
-.players-table thead th:nth-child(2) {
-  left: 48px;
-  z-index: 4;
 }
 
 .players-table-slot {
@@ -837,8 +835,10 @@ button:focus-visible {
 }
 
 .players-table-cell .trait-value-line {
-  align-items: flex-start;
-  gap: 6px;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 5px;
+  overflow: hidden;
 }
 
 .players-table-cell .trait-row-actions {
@@ -847,9 +847,9 @@ button:focus-visible {
 
 .players-table-cell .trait-mini-action,
 .players-table-cell .trait-lock {
-  width: 22px;
-  height: 22px;
-  font-size: 11px;
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
 }
 
 .players-table-cell .trait-lock {
@@ -868,9 +868,9 @@ button:focus-visible {
 }
 
 .players-table-cell .ability-use-button {
-  min-height: 30px;
-  padding: 0 8px;
-  font-size: 11px;
+  min-height: 26px;
+  padding: 0 6px;
+  font-size: 10px;
 }
 
 .players-table-cell .ability-use-button::after {
@@ -1074,10 +1074,21 @@ button:focus-visible {
 .trait-value {
   min-width: 0;
   width: 100%;
+  overflow: hidden;
   overflow-wrap: break-word;
   word-break: normal;
   white-space: normal;
   line-height: 1.35;
+}
+
+.players-table-cell .trait-value {
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.players-table-cell .trait-signal {
+  overflow: hidden;
 }
 
 .trait-value-line > .trait-value {
@@ -2033,5 +2044,15 @@ button:focus-visible {
 
   .stats > .trait-row {
     grid-template-columns: 1fr auto;
+  }
+
+  .players-table-player-col {
+    width: 120px;
+  }
+
+  .players-table th,
+  .players-table td {
+    padding: 7px 5px;
+    font-size: 10px;
   }
 }
