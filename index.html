@@ -14,123 +14,18 @@
         <p>Выбери тему, настрой параметры и получи уникальный пак карточек</p>
       </div>
 
-      <nav class="header-actions" aria-label="Быстрые действия">
-        <button class="icon-button" type="button" aria-label="Тема">☼</button>
-        <button class="icon-button" id="helpButton" type="button" aria-label="Помощь" aria-haspopup="dialog" aria-expanded="false">?</button>
-        <button class="icon-button" type="button" aria-label="Профиль">○</button>
-      </nav>
     </header>
 
-    <section class="room-panel info-panel" id="roomPanel" aria-label="Комната">
-      <div class="room-start">
-        <span class="eyebrow">Онлайн</span>
-        <h2>Комната игры</h2>
-        <p>Создай комнату или присоединись по коду, чтобы все видели один общий пак.</p>
-      </div>
-
-      <div class="room-actions">
-        <label class="field">
-          <span>Имя</span>
-          <input id="roomNameInput" type="text" placeholder="Ваше имя">
-        </label>
-
-        <button class="main-button" id="createRoomButton" type="button">Создать комнату</button>
-      </div>
-
-      <div class="room-join">
-        <label class="field">
-          <span>Код комнаты</span>
-          <input id="roomCodeInput" type="text" placeholder="AB12CD" maxlength="6">
-        </label>
-
-        <button class="secondary-button" id="joinRoomButton" type="button">Присоединиться к комнате</button>
-      </div>
-
-      <div class="room-info" id="roomInfo" hidden>
-        <div>
-          <span class="eyebrow">Код комнаты</span>
-          <strong id="roomCodeDisplay">------</strong>
-        </div>
-        <div>
-          <span class="eyebrow">Ссылка</span>
-          <a id="roomInviteLink" href="#" target="_blank" rel="noreferrer">Пригласить игроков</a>
-        </div>
-        <ul class="room-player-list" id="roomPlayersList"></ul>
-      </div>
-    </section>
-
-    <section class="role-panel info-panel" id="rolePanel" aria-label="Выбор роли">
-      <div class="role-copy">
-        <span class="eyebrow">Роль</span>
-        <h2>Выберите режим</h2>
-      </div>
-
-      <div class="role-actions" role="group" aria-label="Роль в игре">
-        <button class="role-button" id="hostRoleButton" type="button" data-role="host">Я ведущий</button>
-        <button class="role-button" id="playerRoleButton" type="button" data-role="player">Я игрок</button>
-      </div>
-
-      <div class="player-setup" id="playerSetup" hidden>
-        <label class="field">
-          <span>Номер игрока</span>
-          <select id="playerNumberSelect"></select>
-        </label>
-
-        <label class="field">
-          <span>Имя игрока</span>
-          <input id="playerNameInput" type="text" placeholder="Игрок">
-        </label>
-      </div>
-    </section>
-
-    <section class="control-panel" aria-label="Настройки пака">
-      <label class="field">
-        <span>Тема</span>
-        <select id="themeSelect">
-          <option>Киберпанк</option>
-          <option>Катаклизм</option>
-          <option>Зомби</option>
-          <option>Космос</option>
-        </select>
-      </label>
-
-      <label class="field">
-        <span>Количество игроков</span>
-        <select id="playerCountSelect">
-          <option selected>6</option>
-          <option>4</option>
-          <option>5</option>
-          <option>7</option>
-          <option>8</option>
-        </select>
-      </label>
-
-      <label class="field">
-        <span>Стиль</span>
-        <select id="styleSelect">
-          <option selected>Смешной</option>
-          <option>Реалистичный</option>
-          <option>Темный</option>
-          <option>Абсурдный</option>
-        </select>
-      </label>
-
-      <label class="field">
-        <span>Уровень жести</span>
-        <select id="difficultySelect">
-          <option selected>Средний</option>
-          <option>Легкий</option>
-          <option>Жесткий</option>
-        </select>
-      </label>
-
-      <div class="generate-box">
-        <button class="main-button" id="generateButton" type="button">Сгенерировать пак</button>
-        <button class="secondary-button" id="randomThemeButton" type="button">Случайная тема</button>
-      </div>
-    </section>
+    <nav class="top-action-bar" aria-label="Действия игры">
+      <button class="top-action-button primary" id="newGameButton" type="button">Новая игра</button>
+      <button class="top-action-button" id="settingsPanelButton" type="button" aria-haspopup="dialog">Настройки игры</button>
+      <button class="top-action-button" id="roomPanelButton" type="button" aria-haspopup="dialog">Комната</button>
+      <button class="top-action-button" id="rolePanelButton" type="button" aria-haspopup="dialog">Роль</button>
+      <button class="top-action-button help-action" id="helpButton" type="button" aria-label="Помощь" aria-haspopup="dialog" aria-expanded="false">?</button>
+    </nav>
 
     <div class="status-message" id="statusMessage" role="status" aria-live="polite"></div>
+    <div class="pack-summary" id="packSummary" aria-live="polite" hidden></div>
 
     <main class="content">
       <section class="pack-heading">
@@ -169,6 +64,137 @@
         <div class="character-grid" id="characterGrid"></div>
       </section>
     </main>
+  </div>
+
+  <div class="setup-modal-backdrop" id="gameSettingsModal" data-setup-modal hidden>
+    <section class="setup-modal" role="dialog" aria-modal="true" aria-labelledby="gameSettingsTitle">
+      <button class="setup-modal-close" type="button" data-close-setup aria-label="Закрыть">×</button>
+      <span class="eyebrow">Пак</span>
+      <h2 id="gameSettingsTitle">Настройки игры</h2>
+
+      <section class="control-panel setup-panel" aria-label="Настройки пака">
+        <label class="field">
+          <span>Тема</span>
+          <select id="themeSelect">
+            <option>Киберпанк</option>
+            <option>Катаклизм</option>
+            <option>Зомби</option>
+            <option>Космос</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Количество игроков</span>
+          <select id="playerCountSelect">
+            <option selected>6</option>
+            <option>4</option>
+            <option>5</option>
+            <option>7</option>
+            <option>8</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Стиль</span>
+          <select id="styleSelect">
+            <option selected>Смешной</option>
+            <option>Реалистичный</option>
+            <option>Темный</option>
+            <option>Абсурдный</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Уровень жести</span>
+          <select id="difficultySelect">
+            <option selected>Средний</option>
+            <option>Легкий</option>
+            <option>Жесткий</option>
+          </select>
+        </label>
+
+        <div class="generate-box">
+          <button class="main-button" id="generateButton" type="button">Сгенерировать пак</button>
+          <button class="secondary-button" id="randomThemeButton" type="button">Случайная тема</button>
+        </div>
+      </section>
+    </section>
+  </div>
+
+  <div class="setup-modal-backdrop" id="roomSetupModal" data-setup-modal hidden>
+    <section class="setup-modal" role="dialog" aria-modal="true" aria-labelledby="roomSetupTitle">
+      <button class="setup-modal-close" type="button" data-close-setup aria-label="Закрыть">×</button>
+      <span class="eyebrow">Онлайн</span>
+      <h2 id="roomSetupTitle">Комната</h2>
+
+      <section class="room-panel setup-panel" id="roomPanel" aria-label="Комната">
+        <div class="room-start">
+          <h3>Комната игры</h3>
+          <p>Создай комнату или присоединись по коду, чтобы все видели один общий пак.</p>
+        </div>
+
+        <div class="room-actions">
+          <label class="field">
+            <span>Имя</span>
+            <input id="roomNameInput" type="text" placeholder="Ваше имя">
+          </label>
+
+          <button class="main-button" id="createRoomButton" type="button">Создать комнату</button>
+        </div>
+
+        <div class="room-join">
+          <label class="field">
+            <span>Код комнаты</span>
+            <input id="roomCodeInput" type="text" placeholder="AB12CD" maxlength="6">
+          </label>
+
+          <button class="secondary-button" id="joinRoomButton" type="button">Присоединиться к комнате</button>
+        </div>
+
+        <div class="room-info" id="roomInfo" hidden>
+          <div>
+            <span class="eyebrow">Код комнаты</span>
+            <strong id="roomCodeDisplay">------</strong>
+          </div>
+          <div>
+            <span class="eyebrow">Ссылка</span>
+            <a id="roomInviteLink" href="#" target="_blank" rel="noreferrer">Пригласить игроков</a>
+          </div>
+          <ul class="room-player-list" id="roomPlayersList"></ul>
+        </div>
+      </section>
+    </section>
+  </div>
+
+  <div class="setup-modal-backdrop" id="roleSetupModal" data-setup-modal hidden>
+    <section class="setup-modal" role="dialog" aria-modal="true" aria-labelledby="roleSetupTitle">
+      <button class="setup-modal-close" type="button" data-close-setup aria-label="Закрыть">×</button>
+      <span class="eyebrow">Роль</span>
+      <h2 id="roleSetupTitle">Роль в игре</h2>
+
+      <section class="role-panel setup-panel" id="rolePanel" aria-label="Выбор роли">
+        <div class="role-copy">
+          <h3>Выберите режим</h3>
+        </div>
+
+        <div class="role-actions" role="group" aria-label="Роль в игре">
+          <button class="role-button" id="hostRoleButton" type="button" data-role="host">Я ведущий</button>
+          <button class="role-button" id="playerRoleButton" type="button" data-role="player">Я игрок</button>
+        </div>
+
+        <div class="player-setup" id="playerSetup" hidden>
+          <label class="field">
+            <span>Номер игрока</span>
+            <select id="playerNumberSelect"></select>
+          </label>
+
+          <label class="field">
+            <span>Имя игрока</span>
+            <input id="playerNameInput" type="text" placeholder="Игрок">
+          </label>
+        </div>
+      </section>
+    </section>
   </div>
 
   <div class="modal-backdrop" id="confirmModal" hidden>

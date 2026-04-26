@@ -90,11 +90,17 @@ const difficultySelect = document.querySelector("#difficultySelect");
 const generateButton = document.querySelector("#generateButton");
 const randomThemeButton = document.querySelector("#randomThemeButton");
 const statusMessage = document.querySelector("#statusMessage");
+const packSummary = document.querySelector("#packSummary");
 const characterGrid = document.querySelector("#characterGrid");
 const cardViewButton = document.querySelector("#cardViewButton");
 const tableViewButton = document.querySelector("#tableViewButton");
 const gameLogList = document.querySelector("#gameLogList");
 const helpButton = document.querySelector("#helpButton");
+const newGameButton = document.querySelector("#newGameButton");
+const settingsPanelButton = document.querySelector("#settingsPanelButton");
+const roomPanelButton = document.querySelector("#roomPanelButton");
+const rolePanelButton = document.querySelector("#rolePanelButton");
+const setupModals = document.querySelectorAll("[data-setup-modal]");
 const helpModal = document.querySelector("#helpModal");
 const helpCloseButton = document.querySelector("#helpCloseButton");
 const createRoomButton = document.querySelector("#createRoomButton");
@@ -418,6 +424,7 @@ function applyRoomState({ room, currentUser }) {
   } else {
     currentPack = null;
     characterGrid.innerHTML = "";
+    updatePackSummary(null);
     updateRoleControls();
     updateControlAvailability();
     renderGameLog();
@@ -610,27 +617,29 @@ function setGenerationReady(isReady) {
 function generateLocalPack() {
   if (!isHostView()) {
     setStatus("Генерировать пак может только ведущий.", "error");
-    return;
+    return false;
   }
 
   if (!cardsAreReady) {
     setStatus("cards.txt еще загружается.", "error");
-    return;
+    return false;
   }
 
   const settings = getSettings();
   const pack = createLocalPack(settings);
+  pack.settings = settings;
 
   resetGameState(pack);
   renderPack(pack);
 
   if (isOnlineRoom()) {
     socket.emit("host-generate-pack", { roomCode: currentRoomCode, pack });
-    setStatus(`Пак сгенерирован для комнаты ${currentRoomCode}.`, "success");
-    return;
+    setStatus("", "");
+    return true;
   }
 
-  setStatus("Пак сгенерирован локально.", "success");
+  setStatus("", "");
+  return true;
 }
 
 function createLocalPack(settings) {
@@ -801,6 +810,25 @@ function setStatus(message, type) {
   statusMessage.className = `status-message ${type}`.trim();
 }
 
+function updatePackSummary(pack) {
+  if (!packSummary) {
+    return;
+  }
+
+  if (!pack?.players?.length) {
+    packSummary.hidden = true;
+    packSummary.textContent = "";
+    return;
+  }
+
+  const playerCount = pack.players.length;
+  const bunkerSlots = pack.bunker?.availableSlots ?? Math.floor(playerCount / 2);
+  const theme = pack.settings?.theme || getSelectedText(themeSelect);
+
+  packSummary.textContent = `Пак сгенерирован | Игроков: ${playerCount} | Мест в бункере: ${bunkerSlots} | Тема: ${theme}`;
+  packSummary.hidden = false;
+}
+
 function createPlaceholderImage(character) {
   const title = escapeSvgText(canViewTrait(character.number, "profession") ? character.profession : `Игрок ${character.number}`);
   const svg = `
@@ -852,6 +880,7 @@ function updateViewToggle() {
 
 function renderPack(pack) {
   currentPack = pack;
+  updatePackSummary(pack);
   if (!isOnlineRoom()) {
     currentPlayerNumber = clampPlayerNumber(currentPlayerNumber);
     updatePlayerNumberOptions();
@@ -2163,6 +2192,34 @@ function closeConfirm() {
   confirmNoButton.textContent = "Нет";
 }
 
+function openSetupModal(modalId) {
+  const modal = document.querySelector(`#${modalId}`);
+
+  if (!modal) {
+    return;
+  }
+
+  closeHelpPanel();
+  setupModals.forEach((setupModal) => {
+    setupModal.hidden = setupModal !== modal;
+  });
+
+  const closeButton = modal.querySelector("[data-close-setup]");
+  closeButton?.focus();
+}
+
+function closeAllSetupModals() {
+  setupModals.forEach((modal) => {
+    modal.hidden = true;
+  });
+}
+
+function handleGeneratePackAction() {
+  if (generateLocalPack()) {
+    closeAllSetupModals();
+  }
+}
+
 function openHelpPanel() {
   if (!helpModal) {
     return;
@@ -2323,6 +2380,18 @@ helpModal?.addEventListener("click", (event) => {
   }
 });
 
+newGameButton?.addEventListener("click", handleGeneratePackAction);
+settingsPanelButton?.addEventListener("click", () => openSetupModal("gameSettingsModal"));
+roomPanelButton?.addEventListener("click", () => openSetupModal("roomSetupModal"));
+rolePanelButton?.addEventListener("click", () => openSetupModal("roleSetupModal"));
+setupModals.forEach((modal) => {
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal || event.target.closest("[data-close-setup]")) {
+      closeAllSetupModals();
+    }
+  });
+});
+
 confirmYesButton.addEventListener("click", () => {
   if (confirmAction) {
     confirmAction();
@@ -2341,6 +2410,7 @@ confirmModal.addEventListener("click", (event) => {
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
+    closeAllSetupModals();
     closeHelpPanel();
   }
 });
@@ -2360,7 +2430,7 @@ abilityModal.addEventListener("click", (event) => {
   }
 });
 
-generateButton.addEventListener("click", generateLocalPack);
+generateButton.addEventListener("click", handleGeneratePackAction);
 randomThemeButton.addEventListener("click", selectRandomTheme);
 cardViewButton?.addEventListener("click", () => setCharacterView(VIEW_CARDS));
 tableViewButton?.addEventListener("click", () => setCharacterView(VIEW_TABLE));
