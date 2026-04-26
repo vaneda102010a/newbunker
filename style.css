@@ -475,8 +475,8 @@ button:focus-visible {
 .content-container {
   display: grid;
   gap: 18px;
-  width: 95%;
-  max-width: 1800px;
+  width: 98%;
+  max-width: 2000px;
   margin: 0 auto;
   min-width: 0;
 }
@@ -661,9 +661,10 @@ button:focus-visible {
   max-width: 100%;
 }
 
-.players-table-wrap {
+.players-table-wrap,
+.table-container {
   width: 100%;
-  max-width: 100%;
+  max-width: 2000px;
   min-width: 0;
   margin: 0 auto;
   overflow-x: hidden;
@@ -689,19 +690,45 @@ button:focus-visible {
 }
 
 .players-table-number-col {
-  width: 42px;
+  width: 1.96%;
 }
 
 .players-table-player-col {
-  width: 150px;
+  width: 8.4%;
 }
 
-.players-table-trait-col {
+.players-table-gender-col {
+  width: 5.6%;
+}
+
+.players-table-data-col {
   width: auto;
+}
+
+.players-table-bodyType-col,
+.players-table-trait-col {
+  width: 6.54%;
+}
+
+.players-table-age-col {
+  width: 5.6%;
+}
+
+.players-table-profession-col,
+.players-table-health-col,
+.players-table-additionalInfo-col {
+  width: 8.4%;
+}
+
+.players-table-hobby-col,
+.players-table-phobia-col,
+.players-table-largeInventory-col,
+.players-table-backpack-col {
+  width: 7.47%;
 }
 
 .players-table-specialAbility-col {
-  width: auto;
+  width: 10.27%;
 }
 
 .players-table th,
@@ -787,8 +814,9 @@ button:focus-visible {
 
 .players-table-slot {
   display: grid;
-  gap: 9px;
+  gap: 6px;
   min-width: 0;
+  overflow: hidden;
 }
 
 .players-table-player-main {
@@ -802,9 +830,9 @@ button:focus-visible {
   color: var(--text);
   font-size: 13px;
   font-weight: 760;
-  overflow-wrap: break-word;
-  word-break: normal;
-  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .players-table-slot-status {

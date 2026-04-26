@@ -947,13 +947,13 @@ function renderCharacters(characters) {
 function renderPlayersTable(characters) {
   const gameIsOver = isGameOver();
   const table = document.createElement("div");
-  table.className = "players-table-wrap";
+  table.className = "players-table-wrap table-container";
   table.innerHTML = `
     <table class="players-table">
       <colgroup>
         <col class="players-table-number-col">
         <col class="players-table-player-col">
-        ${characterTraits.map((trait) => `<col class="players-table-trait-col players-table-${trait.key}-col">`).join("")}
+        ${characterTraits.map((trait) => `<col class="players-table-data-col players-table-${trait.key}-col">`).join("")}
       </colgroup>
       <thead>
         <tr>
@@ -974,18 +974,36 @@ function renderPlayersTable(characters) {
 function renderPlayerTableRow(character, gameIsOver) {
   const isExcluded = excludedPlayers.has(character.number);
   const isOwn = isOwnPlayer(character.number);
+  const playerTitle = getTablePlayerTitle(character);
 
   return `
     <tr class="${isExcluded ? "excluded" : ""}${isOwn ? " own-row" : ""}" style="--accent: ${character.accent}">
       <th class="players-table-number" scope="row">${character.number}</th>
-      <td class="players-table-player">${renderPlayerTableSlot(character, isExcluded, gameIsOver)}</td>
+      <td class="players-table-player" title="${escapeHtml(playerTitle)}">${renderPlayerTableSlot(character, isExcluded, gameIsOver)}</td>
       ${characterTraits.map((trait) => `
-        <td class="players-table-cell trait-${trait.key}">
+        <td class="players-table-cell trait-${trait.key}" title="${escapeHtml(getTableTraitTitle(character, trait))}">
           ${renderTraitValue(character, trait)}
         </td>
       `).join("")}
     </tr>
   `;
+}
+
+function getTablePlayerTitle(character) {
+  const slotPlayer = getRoomPlayerForSlot(character.number);
+  return slotPlayer?.name || (isOwnPlayer(character.number) && currentPlayerName) || `Игрок ${character.number}`;
+}
+
+function getTableTraitTitle(character, trait) {
+  if (!canViewTrait(character.number, trait.key)) {
+    return "🔒";
+  }
+
+  if (trait.key === "specialAbility") {
+    return getPlayerAbilities(character).join("; ") || "Не указано";
+  }
+
+  return cleanText(character[trait.key], "");
 }
 
 function renderPlayerTableSlot(character, isExcluded, gameIsOver) {
