@@ -603,74 +603,6 @@ button:focus-visible {
   text-transform: none;
 }
 
-.slot-card-body {
-  display: grid;
-  gap: 12px;
-  padding: 58px 18px 20px;
-}
-
-.slot-control {
-  width: 100%;
-  min-width: 0;
-  margin: 0 0 14px;
-}
-
-.slot-button,
-.slot-status {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  min-height: 34px;
-  padding: 0 12px;
-  overflow: hidden;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 760;
-  line-height: 1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.slot-button {
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.055)),
-    rgba(255, 255, 255, 0.05);
-  color: rgba(245, 245, 247, 0.92);
-  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
-}
-
-.slot-button:hover {
-  border-color: rgba(255, 255, 255, 0.28);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.075)),
-    rgba(255, 255, 255, 0.08);
-  transform: translateY(-1px);
-}
-
-.slot-status {
-  border: 1px solid rgba(255, 255, 255, 0.11);
-  background: rgba(255, 255, 255, 0.045);
-  color: var(--muted);
-}
-
-.slot-status.mine {
-  border-color: rgba(183, 232, 196, 0.24);
-  color: rgba(183, 232, 196, 0.9);
-}
-
-.slot-status.taken {
-  color: rgba(245, 245, 247, 0.68);
-}
-
-.slot-hint {
-  margin: 0;
-  color: var(--muted-2);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
 .stats {
   display: grid;
   gap: 8px;
@@ -700,17 +632,24 @@ button:focus-visible {
 }
 
 .stats dd {
-  display: flex;
-  justify-content: flex-end;
   margin: 0;
   min-width: 0;
-  overflow-wrap: anywhere;
-  text-align: right;
+  width: 100%;
+  text-align: left;
 }
 
 .trait-value {
   min-width: 0;
-  overflow-wrap: anywhere;
+  width: 100%;
+  overflow-wrap: break-word;
+  word-break: normal;
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.trait-value-line > .trait-value {
+  flex: 1 1 120px;
+  width: auto;
 }
 
 .trait-value-box {
@@ -718,13 +657,14 @@ button:focus-visible {
   gap: 5px;
   width: 100%;
   min-width: 0;
-  justify-items: end;
+  justify-items: stretch;
 }
 
 .trait-value-line {
   display: flex;
-  justify-content: flex-end;
-  align-items: center;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
   gap: 7px;
   width: 100%;
   min-width: 0;
@@ -738,9 +678,11 @@ button:focus-visible {
   display: inline-flex;
   flex: 0 0 auto;
   gap: 5px;
+  margin-left: auto;
 }
 
 .trait-hidden-placeholder {
+  flex: 1 1 120px;
   min-width: 0;
   color: var(--muted-2);
   font-weight: 650;
@@ -979,15 +921,31 @@ button:focus-visible {
 }
 
 .health-value {
+  display: flex;
+  flex: 1 1 150px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.health-text {
   display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
+  flex: 1 1 auto;
+  align-items: flex-start;
   gap: 6px;
   min-width: 0;
 }
 
+.health-text > .trait-value {
+  flex: 1 1 auto;
+  width: auto;
+}
+
 .health-marker {
   flex: 0 0 auto;
+  margin-top: 0.45em;
   width: 7px;
   height: 7px;
   border-radius: 50%;

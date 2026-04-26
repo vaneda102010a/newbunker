@@ -1,11 +1,7 @@
 const cardColors = ["#9b5cff", "#32aaf3", "#3bd26f", "#ff8b25", "#ffc928", "#ff477d", "#4fd1c5", "#f97316"];
 const ROLE_HOST = "host";
 const ROLE_PLAYER = "player";
-const PUBLIC_APP_URL = "https://newbunker.onrender.com";
-const SERVER_URL =
-  location.hostname === "localhost"
-    ? "http://localhost:3000"
-    : "https://newbunker.onrender.com";
+const PUBLIC_APP_URL = "https://bunker-s4n4.onrender.com";
 const characterTraits = [
   { key: "gender", label: "Пол" },
   { key: "bodyType", label: "Тип тела" },
@@ -98,8 +94,6 @@ let socket = null;
 let currentRoomCode = "";
 let currentSocketId = "";
 let roomPlayers = [];
-let roomSlots = {};
-let roomSlotNames = {};
 let pendingApprovedRequest = null;
 const handledAbilityRequests = new Set();
 
@@ -217,10 +211,7 @@ function initializeSocket() {
     return;
   }
 
-  console.log("Connecting to:", SERVER_URL);
-  socket = io(SERVER_URL, {
-    transports: ["websocket"]
-  });
+  socket = io();
 
   socket.on("connect", () => {
     currentSocketId = socket.id;
@@ -232,15 +223,8 @@ function initializeSocket() {
     }
   });
 
-  socket.on("roomStateUpdated", (payload) => {
-    console.log("roomStateUpdated", payload?.room?.roomCode, payload?.room?.slots);
-    applyRoomState(payload);
-  });
-  socket.on("errorMessage", (message) => {
-    console.error("Socket error:", message);
-    setStatus(message || "Ошибка комнаты.", "error");
-  });
-  socket.on("abilityApprovalRequest", handleAbilityApprovalRequest);
+  socket.on("room-state", applyRoomState);
+  socket.on("ability-approval-request", handleAbilityApprovalRequest);
   socket.on("disconnect", () => {
     setStatus("Соединение с комнатой потеряно. Переподключение...", "error");
   });
@@ -252,7 +236,7 @@ function createOnlineRoom() {
     return;
   }
 
-  socket.emit("createRoom", { name: getRoomPlayerName() }, handleRoomReply);
+  socket.emit("create-room", { name: getRoomPlayerName() }, handleRoomReply);
 }
 
 function joinOnlineRoom() {
@@ -268,7 +252,7 @@ function joinOnlineRoom() {
     return;
   }
 
-  socket.emit("joinRoom", { roomCode, name: getRoomPlayerName() }, handleRoomReply);
+  socket.emit("join-room", { roomCode, name: getRoomPlayerName() }, handleRoomReply);
 }
 
 function handleRoomReply(response) {
@@ -293,8 +277,6 @@ function applyRoomState({ room, currentUser }) {
   currentRoomCode = room.roomCode;
   currentSocketId = socket?.id || currentUser.socketId || currentSocketId;
   roomPlayers = room.players || [];
-  roomSlots = room.slots || {};
-  roomSlotNames = room.slotNames || {};
   appRole = currentUser.isHost ? ROLE_HOST : ROLE_PLAYER;
   currentPlayerNumber = Number(currentUser.playerNumber) || 0;
   currentPlayerName = currentUser.name || "";
@@ -309,7 +291,7 @@ function applyRoomState({ room, currentUser }) {
     renderPack(currentPack);
   } else {
     currentPack = null;
-    renderRoomSlotCards();
+    characterGrid.innerHTML = "";
     updateRoleControls();
     updateControlAvailability();
     renderGameLog();
@@ -357,7 +339,7 @@ function syncHostState(resolvedRequestId = "") {
     return;
   }
 
-  socket.emit("hostSyncState", {
+  socket.emit("host-sync-state", {
     roomCode: currentRoomCode,
     state: collectSharedState(resolvedRequestId)
   });
@@ -517,7 +499,7 @@ function generateLocalPack() {
   renderPack(pack);
 
   if (isOnlineRoom()) {
-    socket.emit("generatePack", { roomCode: currentRoomCode, pack });
+    socket.emit("host-generate-pack", { roomCode: currentRoomCode, pack });
     setStatus(`Пак сгенерирован для комнаты ${currentRoomCode}.`, "success");
     return;
   }
@@ -745,7 +727,6 @@ function renderCharacters(characters) {
       <img class="portrait" src="${createPlaceholderImage(character)}" alt="Игрок ${character.number}">
       <div class="card-body">
         <h3 class="profession">${renderCardTitle(character)}</h3>
-        ${renderSlotControl(character.number)}
         <dl class="stats">
           ${characterTraits.map((trait) => renderTraitRow(character, trait)).join("")}
         </dl>
@@ -764,112 +745,8 @@ function renderCharacters(characters) {
   });
 }
 
-function renderRoomSlotCards() {
-  if (!isOnlineRoom()) {
-    characterGrid.innerHTML = "";
-    return;
-  }
-
-  const slotNumbers = getRoomSlotNumbers();
-  characterGrid.innerHTML = "";
-  characterGrid.style.setProperty("--player-columns", Math.min(slotNumbers.length || 6, 6));
-
-  slotNumbers.forEach((slotNumber, index) => {
-    const card = document.createElement("article");
-    card.className = `character-card slot-card${isMySlot(slotNumber) ? " own-card" : ""}`;
-    card.style.setProperty("--accent", cardColors[index % cardColors.length]);
-    card.innerHTML = `
-      <span class="number-badge">${slotNumber}</span>
-      ${isMySlot(slotNumber) ? `<span class="own-card-badge">Мой слот</span>` : ""}
-      <div class="slot-card-body">
-        <h3 class="profession">Игрок ${slotNumber}</h3>
-        ${renderSlotControl(slotNumber)}
-        <p class="slot-hint">Пак еще не сгенерирован</p>
-      </div>
-    `;
-    characterGrid.append(card);
-  });
-}
-
-function getRoomSlotNumbers() {
-  const slotNumbers = Object.keys(roomSlots || {})
-    .map((slotKey) => Number(slotKey))
-    .filter((slotNumber) => Number.isFinite(slotNumber))
-    .sort((first, second) => first - second);
-
-  return slotNumbers.length > 0 ? slotNumbers : Array.from({ length: 6 }, (_, index) => index + 1);
-}
-
-function getSlotOwner(slotNumber) {
-  return roomSlots?.[String(slotNumber)] || roomSlots?.[slotNumber] || null;
-}
-
-function getSlotName(slotNumber) {
-  return cleanText(roomSlotNames?.[String(slotNumber)] || roomSlotNames?.[slotNumber], "");
-}
-
-function isMySlot(slotNumber) {
-  return Boolean(currentSocketId && getSlotOwner(slotNumber) === currentSocketId);
-}
-
-function renderSlotControl(slotNumber) {
-  if (!isOnlineRoom()) {
-    return "";
-  }
-
-  const ownerId = getSlotOwner(slotNumber);
-
-  if (!ownerId) {
-    return `
-      <div class="slot-control">
-        <button class="slot-button" type="button" data-action="claim-slot" data-slot="${slotNumber}">
-          Занять слот
-        </button>
-      </div>
-    `;
-  }
-
-  if (isMySlot(slotNumber)) {
-    return `<div class="slot-control"><span class="slot-status mine">Мой слот</span></div>`;
-  }
-
-  const slotName = getSlotName(slotNumber) || `Игрок ${slotNumber}`;
-  return `<div class="slot-control"><span class="slot-status taken">Занято (${escapeHtml(slotName)})</span></div>`;
-}
-
-function claimSlot(slotIndex) {
-  if (!isOnlineRoom()) {
-    return;
-  }
-
-  console.log("claimSlot", { roomCode: currentRoomCode, slotIndex });
-  socket.emit("claimSlot", {
-    roomCode: currentRoomCode,
-    slotIndex,
-    playerName: getRoomPlayerName()
-  }, handleSlotReply);
-}
-
-function leaveSlot() {
-  if (!isOnlineRoom()) {
-    return;
-  }
-
-  console.log("leaveSlot", { roomCode: currentRoomCode });
-  socket.emit("leaveSlot", { roomCode: currentRoomCode }, handleSlotReply);
-}
-
-function handleSlotReply(response) {
-  if (!response?.ok) {
-    setStatus(response?.error || "Не удалось обновить слот.", "error");
-    return;
-  }
-
-  setStatus("Слот обновлен.", "success");
-}
-
 function getOwnCardBadgeText() {
-  return currentPlayerName ? `Ваша карта · ${currentPlayerName}` : "Ваша карта";
+  return "Мой слот";
 }
 
 function renderCardTitle(character) {
@@ -902,7 +779,7 @@ function renderTraitValue(character, trait) {
 }
 
 function canViewTrait(playerNumber, traitKey) {
-  return isHostView() || isOwnPlayer(playerNumber) || isTraitRevealed(playerNumber, traitKey);
+  return isOwnPlayer(playerNumber) || isTraitRevealed(playerNumber, traitKey);
 }
 
 function renderHiddenTraitValue(playerNumber, trait) {
@@ -910,7 +787,16 @@ function renderHiddenTraitValue(playerNumber, trait) {
     return renderHostHiddenTraitControls(playerNumber, trait);
   }
 
-  return renderLockButton(playerNumber, trait.key, trait.label, !canRevealTrait(playerNumber));
+  const lockAction = renderLockButton(playerNumber, trait.key, trait.label, !canRevealTrait(playerNumber));
+
+  return `
+    <div class="trait-value-box hidden-player-controls">
+      <div class="trait-value-line">
+        <span class="trait-hidden-placeholder">Скрыто</span>
+        <span class="trait-row-actions">${lockAction}</span>
+      </div>
+    </div>
+  `;
 }
 
 function renderHostHiddenTraitControls(playerNumber, trait) {
@@ -1103,8 +989,10 @@ function renderHealthValue(character) {
 
   return `
     <span class="health-value health-${severity}">
-      <span class="health-marker" aria-hidden="true"></span>
-      <span class="trait-value">${escapeHtml(character.health)}</span>
+      <span class="health-text">
+        <span class="health-marker" aria-hidden="true"></span>
+        <span class="trait-value">${escapeHtml(character.health)}</span>
+      </span>
       <button class="health-help" type="button" data-action="health-info" aria-label="Пояснение здоровья">
         ?
         <span class="health-tooltip" role="tooltip">${escapeHtml(explanation)}</span>
@@ -1344,7 +1232,7 @@ function isTraitRevealed(playerNumber, traitKey) {
 
 function revealTrait(playerNumber, traitKey) {
   if (isOnlineRoom()) {
-    socket.emit("revealTrait", { roomCode: currentRoomCode, playerNumber, traitKey });
+    socket.emit("reveal-trait", { roomCode: currentRoomCode, playerNumber, traitKey });
     return;
   }
 
@@ -1354,7 +1242,7 @@ function revealTrait(playerNumber, traitKey) {
 
 function revealAllTraits(playerNumber) {
   if (isOnlineRoom()) {
-    socket.emit("revealAll", {
+    socket.emit("reveal-all", {
       roomCode: currentRoomCode,
       playerNumber,
       traitKeys: characterTraits.map((trait) => trait.key)
@@ -1386,7 +1274,7 @@ function toggleExcluded(playerNumber) {
   }
 
   if (isOnlineRoom()) {
-    socket.emit("excludePlayer", {
+    socket.emit("exclude-player", {
       roomCode: currentRoomCode,
       playerNumber,
       excluded: !excludedPlayers.has(playerNumber)
@@ -1672,7 +1560,7 @@ function confirmAbilityUse() {
   }
 
   if (isOnlineRoom() && !isHostView()) {
-    socket.emit("abilityRequest", { roomCode: currentRoomCode, context }, (response) => {
+    socket.emit("ability-request", { roomCode: currentRoomCode, context }, (response) => {
       if (!response?.ok) {
         setStatus(response?.error || "Не удалось отправить запрос способности.", "error");
         return;
@@ -2014,11 +1902,6 @@ characterGrid.addEventListener("click", (event) => {
       activeButton.classList.remove("active");
     });
     button.classList.toggle("active", !wasActive);
-    return;
-  }
-
-  if (button.dataset.action === "claim-slot") {
-    claimSlot(Number(button.dataset.slot));
     return;
   }
 
