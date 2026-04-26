@@ -664,10 +664,10 @@ button:focus-visible {
 .players-table-wrap,
 .table-container {
   width: 100%;
-  max-width: 2000px;
+  max-width: none;
   min-width: 0;
   margin: 0 auto;
-  overflow-x: hidden;
+  overflow-x: auto;
   overflow-y: visible;
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -680,8 +680,9 @@ button:focus-visible {
 }
 
 .players-table {
-  width: 100%;
-  table-layout: fixed;
+  width: max-content;
+  min-width: 2400px;
+  table-layout: auto;
   border-collapse: separate;
   border-spacing: 0;
   color: rgba(245, 245, 247, 0.88);
@@ -690,50 +691,66 @@ button:focus-visible {
 }
 
 .players-table-number-col {
-  width: 1.96%;
+  width: 44px;
 }
 
 .players-table-player-col {
-  width: 8.4%;
+  width: 180px;
 }
 
 .players-table-gender-col {
-  width: 5.6%;
+  width: 180px;
 }
 
 .players-table-data-col {
   width: auto;
 }
 
-.players-table-bodyType-col,
+.players-table-bodyType-col {
+  width: 240px;
+}
+
 .players-table-trait-col {
-  width: 6.54%;
+  width: 220px;
 }
 
 .players-table-age-col {
-  width: 5.6%;
+  width: 140px;
 }
 
-.players-table-profession-col,
-.players-table-health-col,
-.players-table-additionalInfo-col {
-  width: 8.4%;
+.players-table-profession-col {
+  width: 260px;
 }
 
-.players-table-hobby-col,
+.players-table-health-col {
+  width: 300px;
+}
+
+.players-table-hobby-col {
+  width: 240px;
+}
+
 .players-table-phobia-col,
-.players-table-largeInventory-col,
+.players-table-largeInventory-col {
+  width: 260px;
+}
+
 .players-table-backpack-col {
-  width: 7.47%;
+  width: 240px;
+}
+
+.players-table-additionalInfo-col {
+  width: 300px;
 }
 
 .players-table-specialAbility-col {
-  width: 10.27%;
+  width: 360px;
 }
 
 .players-table th,
 .players-table td {
   min-width: 0;
+  max-width: 0;
   padding: 8px 7px;
   border-right: 1px solid rgba(255, 255, 255, 0.055);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
@@ -879,18 +896,31 @@ button:focus-visible {
 }
 
 .players-table-cell .trait-value-box {
-  gap: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 42px;
 }
 
 .players-table-cell .trait-value-line {
-  align-items: center;
-  flex-wrap: nowrap;
-  gap: 5px;
+  display: contents;
+}
+
+.players-table-cell .trait-signal,
+.players-table-cell .health-value,
+.players-table-cell .ability-buttons {
+  order: 1;
+  width: 100%;
   overflow: hidden;
 }
 
 .players-table-cell .trait-row-actions {
+  order: 3;
+  align-self: flex-start;
   gap: 4px;
+  margin-top: auto;
+  margin-left: 0;
+  padding-top: 2px;
 }
 
 .players-table-cell .trait-mini-action,
@@ -905,6 +935,7 @@ button:focus-visible {
 }
 
 .players-table-cell .visibility-badge {
+  order: 2;
   width: fit-content;
   max-width: 100%;
 }
@@ -2109,10 +2140,6 @@ button:focus-visible {
 
   .stats > .trait-row {
     grid-template-columns: 1fr auto;
-  }
-
-  .players-table-player-col {
-    width: 120px;
   }
 
   .players-table th,
