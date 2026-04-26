@@ -47,6 +47,9 @@ const characterGrid = document.querySelector("#characterGrid");
 const cardViewButton = document.querySelector("#cardViewButton");
 const tableViewButton = document.querySelector("#tableViewButton");
 const gameLogList = document.querySelector("#gameLogList");
+const helpButton = document.querySelector("#helpButton");
+const helpModal = document.querySelector("#helpModal");
+const helpCloseButton = document.querySelector("#helpCloseButton");
 const createRoomButton = document.querySelector("#createRoomButton");
 const joinRoomButton = document.querySelector("#joinRoomButton");
 const roomNameInput = document.querySelector("#roomNameInput");
@@ -279,6 +282,18 @@ function createOnlineRoom() {
     return;
   }
 
+  showConfirm(
+    "Создать новую комнату?",
+    "Вы точно хотите создать новую комнату, а не присоединиться к существующей?",
+    () => createOnlineRoomAfterConfirm(playerName),
+    {
+      confirmLabel: "Создать комнату",
+      cancelLabel: "Отмена"
+    }
+  );
+}
+
+function createOnlineRoomAfterConfirm(playerName) {
   console.log("Creating room as:", playerName);
 
   if (!socket?.connected) {
@@ -2007,9 +2022,11 @@ function closeAbilityModal() {
   pendingAbility = null;
 }
 
-function showConfirm(title, message, onConfirm) {
+function showConfirm(title, message, onConfirm, options = {}) {
   confirmTitle.textContent = title;
   confirmMessage.textContent = message;
+  confirmYesButton.textContent = options.confirmLabel || "Да";
+  confirmNoButton.textContent = options.cancelLabel || "Нет";
   confirmAction = onConfirm;
   confirmModal.hidden = false;
   confirmYesButton.focus();
@@ -2018,6 +2035,35 @@ function showConfirm(title, message, onConfirm) {
 function closeConfirm() {
   confirmModal.hidden = true;
   confirmAction = null;
+  confirmYesButton.textContent = "Да";
+  confirmNoButton.textContent = "Нет";
+}
+
+function openHelpPanel() {
+  if (!helpModal) {
+    return;
+  }
+
+  helpModal.hidden = false;
+  helpButton?.setAttribute("aria-expanded", "true");
+}
+
+function closeHelpPanel() {
+  if (!helpModal) {
+    return;
+  }
+
+  helpModal.hidden = true;
+  helpButton?.setAttribute("aria-expanded", "false");
+}
+
+function toggleHelpPanel() {
+  if (!helpModal || helpModal.hidden) {
+    openHelpPanel();
+    return;
+  }
+
+  closeHelpPanel();
 }
 
 function escapeHtml(value) {
@@ -2140,6 +2186,19 @@ document.addEventListener("click", (event) => {
   }
 });
 
+helpButton?.addEventListener("pointerenter", openHelpPanel);
+helpButton?.addEventListener("focus", openHelpPanel);
+helpButton?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  openHelpPanel();
+});
+helpCloseButton?.addEventListener("click", closeHelpPanel);
+helpModal?.addEventListener("click", (event) => {
+  if (event.target === helpModal) {
+    closeHelpPanel();
+  }
+});
+
 confirmYesButton.addEventListener("click", () => {
   if (confirmAction) {
     confirmAction();
@@ -2153,6 +2212,12 @@ confirmNoButton.addEventListener("click", closeConfirm);
 confirmModal.addEventListener("click", (event) => {
   if (event.target === confirmModal) {
     closeConfirm();
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeHelpPanel();
   }
 });
 

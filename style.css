@@ -29,6 +29,7 @@ html {
 
 body {
   margin: 0;
+  overflow-x: hidden;
   min-height: 100vh;
   background:
     linear-gradient(180deg, #0b0b0d 0, #050506 360px),
@@ -53,8 +54,10 @@ button:disabled {
 }
 
 .page {
-  width: min(1160px, calc(100% - 56px));
-  margin: 0 auto;
+  width: min(calc(100% - 32px), 1480px);
+  max-width: 1480px;
+  margin-left: auto;
+  margin-right: auto;
   padding: 48px 0 56px;
 }
 
@@ -371,6 +374,7 @@ button:focus-visible {
 .content {
   display: grid;
   gap: 18px;
+  min-width: 0;
 }
 
 .pack-heading {
@@ -529,10 +533,14 @@ button:focus-visible {
 }
 
 .characters-section {
+  width: 100%;
+  min-width: 0;
   margin-top: 8px;
 }
 
 .character-grid {
+  width: 100%;
+  min-width: 0;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 18px;
@@ -545,6 +553,8 @@ button:focus-visible {
 
 .players-table-wrap {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
   overflow-y: visible;
   border: 1px solid var(--border);
@@ -558,7 +568,8 @@ button:focus-visible {
 }
 
 .players-table {
-  width: max(100%, 1780px);
+  width: 100%;
+  min-width: 1480px;
   table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
@@ -572,15 +583,15 @@ button:focus-visible {
 }
 
 .players-table-player-col {
-  width: 150px;
+  width: 148px;
 }
 
 .players-table-trait-col {
-  width: 132px;
+  width: 108px;
 }
 
 .players-table-specialAbility-col {
-  width: 184px;
+  width: 168px;
 }
 
 .players-table th,
@@ -1342,6 +1353,112 @@ button:focus-visible {
   display: none;
 }
 
+.help-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 28;
+  display: grid;
+  place-items: start center;
+  padding: 86px 16px 24px;
+  background: rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: helpFade 0.16s ease both;
+}
+
+.help-backdrop[hidden] {
+  display: none;
+}
+
+.help-panel {
+  position: relative;
+  width: min(720px, 100%);
+  max-height: min(78vh, 760px);
+  padding: 28px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 26px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.095), rgba(255, 255, 255, 0.035)),
+    rgba(20, 20, 23, 0.92);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.48);
+  transform-origin: top center;
+  animation: helpPanelIn 0.18s ease both;
+}
+
+.help-panel h2 {
+  margin: 0 42px 16px 0;
+  color: var(--text);
+  font-size: 25px;
+  line-height: 1.2;
+  font-weight: 780;
+  letter-spacing: 0;
+}
+
+.help-content {
+  max-height: calc(min(78vh, 760px) - 86px);
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.help-content h3 {
+  margin: 20px 0 8px;
+  color: rgba(245, 245, 247, 0.94);
+  font-size: 15px;
+  line-height: 1.35;
+  font-weight: 760;
+}
+
+.help-content p {
+  margin: 0 0 8px;
+  color: rgba(245, 245, 247, 0.74);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.help-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(245, 245, 247, 0.82);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.help-close:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+@keyframes helpFade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes helpPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .confirm-modal {
   width: min(420px, 100%);
   padding: 22px;
@@ -1426,7 +1543,7 @@ button:focus-visible {
 
 @media (max-width: 1020px) {
   .page {
-    width: min(100% - 36px, 860px);
+    width: min(calc(100% - 32px), 860px);
     padding-top: 36px;
   }
 
@@ -1461,7 +1578,7 @@ button:focus-visible {
 
 @media (max-width: 720px) {
   .page {
-    width: min(100% - 24px, 560px);
+    width: min(calc(100% - 24px), 560px);
     padding: 24px 0 36px;
   }
 
@@ -1489,6 +1606,26 @@ button:focus-visible {
 
   .view-toggle-button {
     flex: 1;
+  }
+
+  .help-backdrop {
+    align-items: start;
+    padding: 14px 12px;
+  }
+
+  .help-panel {
+    max-height: calc(100vh - 28px);
+    padding: 22px;
+    border-radius: 22px;
+  }
+
+  .help-panel h2 {
+    margin-right: 36px;
+    font-size: 21px;
+  }
+
+  .help-content {
+    max-height: calc(100vh - 112px);
   }
 
   .control-panel,
