@@ -663,8 +663,8 @@ button:focus-visible {
 
 .players-table-wrap,
 .table-container {
-  width: 100%;
-  max-width: none;
+  width: 96%;
+  max-width: 1800px;
   min-width: 0;
   margin: 0 auto;
   overflow-x: auto;
@@ -680,9 +680,9 @@ button:focus-visible {
 }
 
 .players-table {
-  width: max-content;
-  min-width: 2400px;
-  table-layout: auto;
+  width: 100%;
+  min-width: 1500px;
+  table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
   color: rgba(245, 245, 247, 0.88);
@@ -695,11 +695,11 @@ button:focus-visible {
 }
 
 .players-table-player-col {
-  width: 180px;
+  width: 150px;
 }
 
 .players-table-gender-col {
-  width: 180px;
+  width: 110px;
 }
 
 .players-table-data-col {
@@ -707,51 +707,52 @@ button:focus-visible {
 }
 
 .players-table-bodyType-col {
-  width: 240px;
-}
-
-.players-table-trait-col {
-  width: 220px;
-}
-
-.players-table-age-col {
   width: 140px;
 }
 
+.players-table-trait-col {
+  width: 140px;
+}
+
+.players-table-age-col {
+  width: 90px;
+}
+
 .players-table-profession-col {
-  width: 260px;
+  width: 160px;
 }
 
 .players-table-health-col {
-  width: 300px;
+  width: 170px;
 }
 
 .players-table-hobby-col {
-  width: 240px;
+  width: 140px;
 }
 
 .players-table-phobia-col,
 .players-table-largeInventory-col {
-  width: 260px;
+  width: 150px;
 }
 
 .players-table-backpack-col {
-  width: 240px;
+  width: 140px;
 }
 
 .players-table-additionalInfo-col {
-  width: 300px;
+  width: 170px;
 }
 
 .players-table-specialAbility-col {
-  width: 360px;
+  width: 190px;
 }
 
 .players-table th,
 .players-table td {
   min-width: 0;
-  max-width: 0;
-  padding: 8px 7px;
+  height: auto;
+  min-height: 64px;
+  padding: 10px 12px;
   border-right: 1px solid rgba(255, 255, 255, 0.055);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   vertical-align: top;
@@ -896,31 +897,31 @@ button:focus-visible {
 }
 
 .players-table-cell .trait-value-box {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  min-height: 42px;
+  display: grid;
+  gap: 4px;
+  min-height: 0;
 }
 
 .players-table-cell .trait-value-line {
-  display: contents;
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+  gap: 5px;
+  overflow: hidden;
 }
 
 .players-table-cell .trait-signal,
 .players-table-cell .health-value,
 .players-table-cell .ability-buttons {
-  order: 1;
   width: 100%;
   overflow: hidden;
 }
 
 .players-table-cell .trait-row-actions {
-  order: 3;
   align-self: flex-start;
   gap: 4px;
-  margin-top: auto;
-  margin-left: 0;
-  padding-top: 2px;
+  margin-left: auto;
+  padding-top: 1px;
 }
 
 .players-table-cell .trait-mini-action,
@@ -935,9 +936,10 @@ button:focus-visible {
 }
 
 .players-table-cell .visibility-badge {
-  order: 2;
   width: fit-content;
   max-width: 100%;
+  padding: 2px 6px;
+  font-size: 9px;
 }
 
 .players-table-cell .ability-buttons {
@@ -1174,12 +1176,15 @@ button:focus-visible {
 }
 
 .players-table-cell .trait-value {
+  max-width: 100%;
+  overflow: hidden;
   overflow-wrap: normal;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .players-table-cell .trait-signal {
+  max-width: 100%;
   overflow: hidden;
 }
 
