@@ -702,10 +702,6 @@ button:focus-visible {
   width: 120px;
 }
 
-.players-table-data-col {
-  width: auto;
-}
-
 .players-table-bodyType-col {
   width: 140px;
 }
