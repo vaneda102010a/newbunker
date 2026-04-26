@@ -12,7 +12,8 @@ const PROJECT_ROOT = __dirname;
 const STATIC_FILES = {
   "/script.js": "script.js",
   "/style.css": "style.css",
-  "/data.js": "data.js"
+  "/data.js": "data.js",
+  "/images/bunker-bg.jpg": "public/images/bunker-bg.jpg"
 };
 const rooms = new Map();
 

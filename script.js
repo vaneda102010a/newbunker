@@ -824,8 +824,9 @@ function updatePackSummary(pack) {
   const playerCount = pack.players.length;
   const bunkerSlots = pack.bunker?.availableSlots ?? Math.floor(playerCount / 2);
   const theme = pack.settings?.theme || getSelectedText(themeSelect);
+  const style = pack.settings?.style || getSelectedText(styleSelect);
 
-  packSummary.textContent = `Пак сгенерирован | Игроков: ${playerCount} | Мест в бункере: ${bunkerSlots} | Тема: ${theme}`;
+  packSummary.textContent = `Пак сгенерирован | Игроков: ${playerCount} | Мест в бункере: ${bunkerSlots} | Тема: ${theme} | Стиль: ${style}`;
   packSummary.hidden = false;
 }
 

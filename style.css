@@ -1,7 +1,7 @@
 :root {
   color-scheme: dark;
   --bg: #050506;
-  --surface: rgba(22, 22, 24, 0.76);
+  --surface: rgba(15, 15, 18, 0.78);
   --surface-strong: rgba(32, 32, 35, 0.82);
   --surface-soft: rgba(255, 255, 255, 0.055);
   --border: rgba(255, 255, 255, 0.12);
@@ -15,8 +15,8 @@
   --yellow: #d8bf65;
   --pink: #d66a72;
   --red: #ef6a6a;
-  --shadow: 0 24px 70px rgba(0, 0, 0, 0.46);
-  --shadow-soft: 0 12px 34px rgba(0, 0, 0, 0.28);
+  --shadow: 0 22px 54px rgba(0, 0, 0, 0.42);
+  --shadow-soft: 0 12px 28px rgba(0, 0, 0, 0.32);
 }
 
 * {
@@ -28,15 +28,30 @@ html {
 }
 
 body {
+  position: relative;
   margin: 0;
   overflow-x: hidden;
   min-height: 100vh;
-  background:
-    linear-gradient(180deg, #0b0b0d 0, #050506 360px),
-    #050506;
+  background-color: #050506;
+  background-image: url("/images/bunker-bg.jpg");
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, Helvetica, sans-serif;
   font-size: 15px;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(1.5px);
+  -webkit-backdrop-filter: blur(1.5px);
 }
 
 button,
@@ -54,6 +69,8 @@ button:disabled {
 }
 
 .page {
+  position: relative;
+  z-index: 1;
   width: min(calc(100% - 32px), 1480px);
   max-width: 1480px;
   margin-left: auto;
@@ -113,11 +130,11 @@ button:disabled {
   margin: 0 0 14px;
   padding: 8px;
   border: 1px solid var(--border-soft);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.045);
+  border-radius: 16px;
+  background: var(--surface);
   box-shadow: var(--shadow-soft);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .top-action-button {
@@ -163,8 +180,9 @@ button:disabled {
   border: 1px solid var(--border);
   background: var(--surface);
   box-shadow: var(--shadow);
-  backdrop-filter: blur(22px);
-  -webkit-backdrop-filter: blur(22px);
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .room-panel {
@@ -174,7 +192,7 @@ button:disabled {
   align-items: end;
   margin: 0 0 18px;
   padding: 18px;
-  border-radius: 24px;
+  border-radius: 16px;
 }
 
 .room-start h2 {
@@ -245,7 +263,7 @@ button:disabled {
   align-items: end;
   margin: 0 0 18px;
   padding: 18px;
-  border-radius: 24px;
+  border-radius: 16px;
 }
 
 .role-copy h2 {
@@ -294,7 +312,7 @@ button:disabled {
   align-items: end;
   margin: 0 0 18px;
   padding: 18px;
-  border-radius: 24px;
+  border-radius: 16px;
 }
 
 .field {
@@ -423,12 +441,15 @@ button:focus-visible {
   margin: 0 0 18px;
   padding: 9px 12px;
   border: 1px solid var(--border-soft);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
   color: rgba(245, 245, 247, 0.82);
   font-size: 13px;
   font-weight: 700;
   line-height: 1.2;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .pack-summary[hidden] {
@@ -497,7 +518,7 @@ button:focus-visible {
   gap: 0;
   overflow: hidden;
   padding: 0;
-  border-radius: 24px;
+  border-radius: 16px;
 }
 
 .overview-panel.info-panel {
@@ -563,7 +584,7 @@ button:focus-visible {
   gap: 16px;
   align-items: start;
   padding: 18px 20px;
-  border-radius: 24px;
+  border-radius: 16px;
 }
 
 .game-log-header h3 {
@@ -604,18 +625,14 @@ button:focus-visible {
 
 .character-grid {
   width: 100%;
-  max-width: min(1400px, var(--cards-grid-max, 1400px));
+  max-width: 1480px;
   min-width: 0;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
   justify-content: center;
-  gap: 16px;
+  gap: 12px;
   align-items: start;
-}
-
-.character-grid.cards-view[data-player-count="6"] {
-  --cards-grid-max: 900px;
 }
 
 .character-grid.table-view {
@@ -630,13 +647,13 @@ button:focus-visible {
   overflow-x: auto;
   overflow-y: visible;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: 16px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.025)),
-    rgba(20, 20, 22, 0.76);
+    var(--surface);
   box-shadow: var(--shadow-soft);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .players-table {
@@ -881,10 +898,10 @@ button:focus-visible {
   min-width: 0;
   overflow: visible;
   border-color: rgba(255, 255, 255, 0.1);
-  border-radius: 24px;
+  border-radius: 16px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.065), rgba(255, 255, 255, 0.025)),
-    rgba(24, 24, 27, 0.72);
+    var(--surface);
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--accent) 34%, transparent),
     0 22px 55px rgba(0, 0, 0, 0.36);
@@ -897,7 +914,7 @@ button:focus-visible {
   position: absolute;
   inset: -1px -1px auto;
   height: 3px;
-  border-radius: 24px 24px 0 0;
+  border-radius: 16px 16px 0 0;
   background: var(--accent);
   opacity: 0.72;
 }
@@ -1544,11 +1561,11 @@ button:focus-visible {
   width: min(760px, 100%);
   padding: 22px;
   border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 24px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.032)),
-    rgba(20, 20, 23, 0.94);
-  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   transform-origin: top center;
   animation: setupModalIn 0.2s ease both;
 }
@@ -1695,11 +1712,11 @@ button:focus-visible {
   padding: 28px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 26px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.095), rgba(255, 255, 255, 0.035)),
-    rgba(20, 20, 23, 0.92);
-  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.48);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   transform-origin: top center;
   animation: helpPanelIn 0.18s ease both;
 }
@@ -1780,8 +1797,8 @@ button:focus-visible {
 .confirm-modal {
   width: min(420px, 100%);
   padding: 22px;
-  border-radius: 24px;
-  background: rgba(24, 24, 27, 0.9);
+  border-radius: 16px;
+  background: var(--surface);
 }
 
 .confirm-modal h3 {
@@ -1943,7 +1960,7 @@ button:focus-visible {
   .help-panel {
     max-height: calc(100vh - 28px);
     padding: 22px;
-    border-radius: 22px;
+    border-radius: 16px;
   }
 
   .help-panel h2 {
@@ -1972,7 +1989,7 @@ button:focus-visible {
 
   .setup-modal {
     padding: 20px;
-    border-radius: 22px;
+    border-radius: 16px;
   }
 
   .control-panel,
