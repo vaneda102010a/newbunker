@@ -681,7 +681,7 @@ button:focus-visible {
 
 .players-table {
   width: 100%;
-  min-width: 1500px;
+  min-width: 1700px;
   table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
@@ -699,7 +699,7 @@ button:focus-visible {
 }
 
 .players-table-gender-col {
-  width: 110px;
+  width: 120px;
 }
 
 .players-table-data-col {
@@ -751,14 +751,13 @@ button:focus-visible {
 .players-table td {
   min-width: 0;
   height: auto;
-  min-height: 64px;
-  padding: 10px 12px;
+  min-height: 58px;
+  padding: 9px 10px;
   border-right: 1px solid rgba(255, 255, 255, 0.055);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   vertical-align: top;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .players-table th:last-child,
@@ -777,6 +776,9 @@ button:focus-visible {
   font-size: 11px;
   font-weight: 780;
   text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
@@ -849,8 +851,11 @@ button:focus-visible {
   font-size: 13px;
   font-weight: 760;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.25;
+  white-space: normal;
 }
 
 .players-table-slot-status {
@@ -898,15 +903,14 @@ button:focus-visible {
 
 .players-table-cell .trait-value-box {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   min-height: 0;
 }
 
 .players-table-cell .trait-value-line {
-  display: flex;
-  align-items: flex-start;
-  flex-wrap: nowrap;
-  gap: 5px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3px;
   overflow: hidden;
 }
 
@@ -920,8 +924,8 @@ button:focus-visible {
 .players-table-cell .trait-row-actions {
   align-self: flex-start;
   gap: 4px;
-  margin-left: auto;
-  padding-top: 1px;
+  margin-left: 0;
+  padding-top: 0;
 }
 
 .players-table-cell .trait-mini-action,
@@ -938,7 +942,7 @@ button:focus-visible {
 .players-table-cell .visibility-badge {
   width: fit-content;
   max-width: 100%;
-  padding: 2px 6px;
+  padding: 2px 5px;
   font-size: 9px;
 }
 
@@ -1179,13 +1183,25 @@ button:focus-visible {
   max-width: 100%;
   overflow: hidden;
   overflow-wrap: normal;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.25;
+  white-space: normal;
 }
 
 .players-table-cell .trait-signal {
   max-width: 100%;
   overflow: hidden;
+}
+
+.players-table-cell .ability-label {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.2;
+  white-space: normal;
 }
 
 .trait-value-line > .trait-value {
