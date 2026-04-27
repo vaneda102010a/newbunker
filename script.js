@@ -729,11 +729,21 @@ function createLocalPack(settings) {
   const drawState = createDrawState();
   const specialAbilityHands = createSpecialAbilityHands(playerCount, drawState);
 
+  const players = Array.from({ length: playerCount }, (_, index) => createLocalPlayer(index, specialAbilityHands[index], drawState));
+
+  // Для темы Фэнтези: если в разделе "Пол" хранятся расы — генерируем итоговый пол на основании расы
+  if (themeId === "fantasy") {
+    players.forEach((p) => {
+      const race = cleanText(p.gender, "");
+      p.gender = getGenderByRace(race);
+    });
+  }
+
   return {
     themeId,
     catastrophe,
     bunker,
-    players: Array.from({ length: playerCount }, (_, index) => createLocalPlayer(index, specialAbilityHands[index], drawState))
+    players
   };
 }
 
@@ -751,11 +761,14 @@ function createRandomizedBunker(template, availableSlots) {
 
 function createLocalPlayer(index, abilityCards, drawState) {
   const health = drawCard(cardSections.health, drawState);
+  const race = drawCard("Раса", drawState);
+  const age = getAgeByRace(race);
 
   return {
     number: index + 1,
+    race,
     gender: drawCard(cardSections.gender, drawState),
-    age: generateAge(),
+    age: age,
     bodyType: drawCard(cardSections.bodyType, drawState),
     trait: drawCard(cardSections.trait, drawState),
     profession: drawCard(cardSections.profession, drawState),
@@ -2205,6 +2218,150 @@ function refreshDerivedTraitData(player, traitKey) {
 
   player.healthSeverity = getHealthSeverity(player.health);
   player.healthExplanation = getHealthExplanation(player.health);
+}
+
+// ===== ГЕНЕРАЦИЯ ПОЛА С УЧЁТОМ РАСЫ =====
+
+function getGenderByRace(race) {
+  const rand = Math.random() * 100;
+  const r = String(race || "").trim();
+
+  // 100% женские
+  if (["Фея", "Гарпия"].includes(r)) {
+    return "Женщина";
+  }
+
+  // Дроу
+  if (r === "Тёмный эльф (дроу)") {
+    if (rand < 91) return "Женщина";
+    return "Мужчина";
+  }
+
+  // Все эльфы (кроме дроу)
+  if ([
+    "Эльф",
+    "Лесной эльф",
+    "Высший эльф"
+  ].includes(r)) {
+    if (rand < 80) return "Женщина";
+    if (rand < 98) return "Мужчина";
+    return "Бесполый";
+  }
+
+  // Нимфа
+  if (r === "Нимфа") {
+    if (rand < 80) return "Женщина";
+    if (rand < 90) return "Мужчина";
+    return "Бесполый";
+  }
+
+  // ОБЩИЙ СЛУЧАЙ
+  if (rand < 50) return "Женщина";
+  if (rand < 92) return "Мужчина";
+  return "Бесполый";
+}
+
+// ===== РАСЧЁТ ВЫЖИВАЕМОСТИ (ТОЛЬКО ДЛЯ ВЕДУЩЕГО) =====
+
+function calculateSurvival(players, user) {
+  if (!user || (user.role !== ROLE_HOST && user.role !== "host")) return null;
+
+  let score = 0;
+
+  const allItems = players.flatMap((p) => [String(p.largeInventory || ""), String(p.backpack || "")]).map((s) => s.toLowerCase());
+  const professions = players.map((p) => String(p.profession || "").toLowerCase());
+  const traits = players.map((p) => String(p.trait || "").toLowerCase());
+  const health = players.map((p) => String(p.health || "").toLowerCase());
+  const info = players.map((p) => String(p.additionalInfo || "").toLowerCase());
+
+  // РЕСУРСЫ
+  if (allItems.some((i) => i.includes("консервы") || i.includes("пайки"))) score += 50;
+  if (allItems.some((i) => i.includes("семена")) || professions.some((p) => p.includes("фермер"))) score += 50;
+  if (allItems.some((i) => i.includes("вода") || i.includes("фильтр"))) score += 50;
+
+  // ПРОФЕССИИ
+  if (professions.some((p) => p.includes("врач") || p.includes("мед"))) score += 75;
+  if (professions.some((p) => p.match(/инженер|механик|электрик|строитель/))) score += 75;
+  if (professions.some((p) => p.match(/охранник|военный|полицейский/))) score += 25;
+  if (professions.some((p) => p.match(/фермер|агроном|охотник/))) score += 25;
+
+  // ИНФА
+  if (info.some((i) => i.includes("образования"))) score += 25;
+  if (info.some((i) => i.includes("учёный") || i.includes("учен"))) score += 50;
+  if (info.some((i) => i.includes("катастрофе"))) score += 25;
+
+  // ОБОРУДОВАНИЕ
+  if (allItems.some((i) => i.includes("генератор") || i.includes("солнеч"))) score += 50;
+  if (allItems.some((i) => i.includes("инструмент"))) score += 25;
+  if (allItems.some((i) => i.includes("аптечка") || i.includes("мед"))) score += 25;
+
+  // ЗДОРОВЬЕ
+  health.forEach((h) => {
+    if (h.includes("идеальное") || h.includes("сильный иммунитет") || h.includes("иммунитет")) score += 10;
+    if (h.match(/рак|инсульт|тяжёл/)) score -= 50;
+    if (h.match(/психоз|шизофрени/)) score -= 40;
+  });
+
+  // ЧЕРТЫ
+  traits.forEach((t) => {
+    if (t.includes("лидер")) score += 25;
+    if (t.includes("работяга") || t.includes("работ")) score += 25;
+    if (t.includes("миротворец")) score += 25;
+    if (t.includes("конфликт")) score -= 25;
+    if (t.includes("ленив")) score -= 25;
+  });
+
+  // СИНЕРГИЯ
+  if (professions.some((p) => p.includes("фермер")) && allItems.some((i) => i.includes("семена"))) score += 50;
+  if (professions.some((p) => p.includes("врач")) && allItems.some((i) => i.includes("аптечка"))) score += 50;
+  if (professions.some((p) => p.match(/инженер|механик/)) && allItems.some((i) => i.includes("инструмент"))) score += 50;
+
+  // РЕЗУЛЬТАТ
+  let result = "";
+  if (score < 200) result = "Вы погибнете";
+  else if (score < 350) result = "Шансы низкие";
+  else if (score < 500) result = "Выживете с потерями";
+  else result = "Высокие шансы на выживание";
+
+  return { score, result };
+}
+
+// Возвращает случайное целое между min и max включительно
+function getRandomInt(min, max) {
+  const lo = Math.ceil(Number(min) || 0);
+  const hi = Math.floor(Number(max) || 0);
+  if (hi <= lo) return lo;
+  return Math.floor(Math.random() * (hi - lo + 1)) + lo;
+}
+
+// ===== ГЕНЕРАЦИЯ ВОЗРАСТА ПО РАСЕ =====
+function getAgeByRace(race) {
+  const r = String(race || "").trim();
+  const ranges = {
+    "Высший эльф": [100, 700],
+    "Эльф": [100, 600],
+    "Лесной эльф": [80, 550],
+    "Тёмный эльф (дроу)": [80, 500],
+    "Гном": [40, 450],
+    "Дворф": [40, 350],
+    "Орк": [15, 140],
+    "Нимфа": [20, 400],
+    "Сатир": [20, 400],
+    "Аасимар": [18, 120],
+    "Кобольд": [10, 90],
+    "Тролль": [15, 90],
+    "Тифлинг": [16, 80],
+    "Драконорожденный": [15, 75],
+    "Ламия": [15, 70],
+    "Гарпия": [15, 70],
+    "Гоблин": [8, 50],
+    "Фея": [10, 100],
+    "Младший Демон": [10, 1000],
+    "Суккуб/Инкуб": [100, 10000]
+  };
+
+  const pair = ranges[r] || [18, 60];
+  return getRandomInt(pair[0], pair[1]);
 }
 
 function getTraitInstrumental(traitKey) {
