@@ -5,6 +5,11 @@ const VIEW_CARDS = "cards";
 const VIEW_TABLE = "table";
 const CHARACTER_VIEW_STORAGE_KEY = "bunkerCharacterView";
 const PUBLIC_APP_URL = "https://bunker-s4n4.onrender.com";
+const DEFAULT_THEME_ID = "classic";
+const themes = [
+  { id: "classic", name: "Классическая" },
+  { id: "fantasy", name: "Фэнтези" }
+];
 const characterTraits = [
   { key: "gender", label: "Пол" },
   { key: "bodyType", label: "Тип тела" },
@@ -187,9 +192,30 @@ function getSelectedText(select) {
   return select.options[select.selectedIndex].textContent.trim();
 }
 
+function renderThemeOptions() {
+  if (!themeSelect) {
+    return;
+  }
+
+  themeSelect.innerHTML = themes
+    .map((theme) => `<option value="${theme.id}" ${theme.id === DEFAULT_THEME_ID ? "selected" : ""}>${theme.name}</option>`)
+    .join("");
+}
+
+function getThemeById(themeId) {
+  return themes.find((theme) => theme.id === themeId) || themes[0];
+}
+
+function getSelectedTheme() {
+  return getThemeById(themeSelect?.value || DEFAULT_THEME_ID);
+}
+
 function getSettings() {
+  const selectedTheme = getSelectedTheme();
+
   return {
-    theme: getSelectedText(themeSelect),
+    theme: selectedTheme.id,
+    themeName: selectedTheme.name,
     playerCount: Number(getSelectedText(playerCountSelect)),
     style: getSelectedText(styleSelect),
     difficulty: getSelectedText(difficultySelect)
@@ -658,6 +684,7 @@ function generateLocalPack() {
 
 function createLocalPack(settings) {
   const playerCount = Number(settings.playerCount || 6);
+  const themeId = getThemeById(settings.theme || DEFAULT_THEME_ID).id;
   const availableSlots = Math.floor(playerCount / 2);
   const catastrophe = { ...pickRandom(window.BUNKER_DATA.catastrophes) };
   const bunker = createRandomizedBunker(pickRandom(window.BUNKER_DATA.bunkers), availableSlots);
@@ -665,6 +692,7 @@ function createLocalPack(settings) {
   const specialAbilityHands = createSpecialAbilityHands(playerCount, drawState);
 
   return {
+    themeId,
     catastrophe,
     bunker,
     players: Array.from({ length: playerCount }, (_, index) => createLocalPlayer(index, specialAbilityHands[index], drawState))
@@ -837,7 +865,7 @@ function updatePackSummary(pack) {
 
   const playerCount = pack.players.length;
   const bunkerSlots = pack.bunker?.availableSlots ?? Math.floor(playerCount / 2);
-  const theme = pack.settings?.theme || getSelectedText(themeSelect);
+  const theme = pack.settings?.themeName || getThemeById(pack.settings?.theme || pack.themeId || themeSelect?.value).name;
   const style = pack.settings?.style || getSelectedText(styleSelect);
 
   packSummary.textContent = `Пак сгенерирован | Игроков: ${playerCount} | Мест в бункере: ${bunkerSlots} | Тема: ${theme} | Стиль: ${style}`;
@@ -2495,6 +2523,7 @@ playerCountSelect.addEventListener("change", () => {
 });
 
 setGenerationReady(false);
+renderThemeOptions();
 updateRoleControls();
 updateViewToggle();
 
