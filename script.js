@@ -10,6 +10,10 @@ const themes = [
   { id: "classic", name: "Классическая" },
   { id: "fantasy", name: "Фэнтези" }
 ];
+const themeCardSources = {
+  classic: { path: "/cards.txt", fileName: "cards.txt", allowFallback: true },
+  fantasy: { path: "/cards-fantasy.txt", fileName: "cards Fantasy.txt", allowFallback: false }
+};
 const characterTraits = [
   { key: "gender", label: "Пол" },
   { key: "bodyType", label: "Тип тела" },
@@ -179,6 +183,7 @@ let characterView = getSavedCharacterView();
 let pendingCreateRoomName = "";
 let pendingApprovedRequest = null;
 const handledAbilityRequests = new Set();
+const cardDatabaseCache = new Map();
 
 function getSavedCharacterView() {
   try {
@@ -575,36 +580,54 @@ function createFallbackCardDatabase() {
     ]
   };
 
-  validateCardDatabase(database);
+  validateCardDatabase(database, "fallback cards");
   return database;
 }
 
-async function loadCardDatabase() {
-  const requestedUrl = new URL("/cards.txt", window.location.href).href;
+function getThemeCardSource(themeId) {
+  return themeCardSources[getThemeById(themeId).id] || themeCardSources[DEFAULT_THEME_ID];
+}
+
+async function loadCardsForTheme(themeId) {
+  const resolvedThemeId = getThemeById(themeId).id;
+
+  if (cardDatabaseCache.has(resolvedThemeId)) {
+    return cardDatabaseCache.get(resolvedThemeId);
+  }
+
+  const database = await loadCardDatabase(resolvedThemeId);
+  cardDatabaseCache.set(resolvedThemeId, database);
+  return database;
+}
+
+async function loadCardDatabase(themeId = DEFAULT_THEME_ID) {
+  const source = getThemeCardSource(themeId);
+  const requestedUrl = new URL(source.path, window.location.href).href;
   let response;
 
   try {
-    response = await fetch("/cards.txt");
+    response = await fetch(source.path);
   } catch (error) {
-    logCardsLoadError(error, requestedUrl, response);
+    logCardsLoadError(error, requestedUrl, source.fileName, response);
     throw error;
   }
 
   if (!response.ok) {
-    logCardsLoadError(new Error(`cards.txt returned ${response.status} ${response.statusText}`), requestedUrl, response);
-    throw new Error(`cards.txt returned ${response.status} ${response.statusText}`);
+    const error = new Error(`${source.fileName} returned ${response.status} ${response.statusText}`);
+    logCardsLoadError(error, requestedUrl, source.fileName, response);
+    throw error;
   }
 
   try {
-    return parseCardsText(await response.text());
+    return parseCardsText(await response.text(), source.fileName);
   } catch (error) {
-    logCardsLoadError(error, requestedUrl, response);
+    logCardsLoadError(error, requestedUrl, source.fileName, response);
     throw error;
   }
 }
 
-function logCardsLoadError(error, requestedUrl, response = null) {
-  console.error("Не удалось загрузить cards.txt", {
+function logCardsLoadError(error, requestedUrl, fileName, response = null) {
+  console.error(`Не удалось загрузить ${fileName}`, {
     currentUrl: window.location.href,
     requestedUrl,
     status: response ? `${response.status} ${response.statusText}` : "нет ответа",
@@ -612,7 +635,7 @@ function logCardsLoadError(error, requestedUrl, response = null) {
   });
 }
 
-function parseCardsText(text) {
+function parseCardsText(text, fileName = "cards.txt") {
   const database = createEmptyCardDatabase();
   let currentSection = "";
 
@@ -637,15 +660,15 @@ function parseCardsText(text) {
     }
   });
 
-  validateCardDatabase(database);
+  validateCardDatabase(database, fileName);
   return database;
 }
 
-function validateCardDatabase(database) {
+function validateCardDatabase(database, fileName = "cards.txt") {
   const missing = requiredCardSections.filter((section) => !database[section]?.length);
 
   if (missing.length > 0) {
-    throw new Error(`cards.txt missing cards for: ${missing.join(", ")}`);
+    throw new Error(`${fileName} missing cards for: ${missing.join(", ")}`);
   }
 }
 
@@ -654,18 +677,31 @@ function setGenerationReady(isReady) {
   updateControlAvailability();
 }
 
-function generateLocalPack() {
+async function generateLocalPack() {
   if (!isHostView()) {
     setStatus("Генерировать пак может только ведущий.", "error");
     return false;
   }
 
   if (!cardsAreReady) {
-    setStatus("cards.txt еще загружается.", "error");
+    setStatus("Карты еще загружаются.", "error");
     return false;
   }
 
   const settings = getSettings();
+  const source = getThemeCardSource(settings.theme);
+
+  setGenerationReady(false);
+
+  try {
+    cardDatabase = await loadCardsForTheme(settings.theme);
+  } catch (error) {
+    console.error(error);
+    setStatus(`Не удалось загрузить ${source.fileName}. Проверь, что файл существует и называется точно «${source.fileName}».`, "error");
+    setGenerationReady(true);
+    return false;
+  }
+
   const pack = createLocalPack(settings);
   pack.settings = settings;
 
@@ -675,10 +711,12 @@ function generateLocalPack() {
   if (isOnlineRoom()) {
     socket.emit("host-generate-pack", { roomCode: currentRoomCode, pack });
     setStatus("", "");
+    setGenerationReady(true);
     return true;
   }
 
   setStatus("", "");
+  setGenerationReady(true);
   return true;
 }
 
@@ -2275,8 +2313,8 @@ function closeAllSetupModals() {
   });
 }
 
-function handleGeneratePackAction() {
-  if (generateLocalPack()) {
+async function handleGeneratePackAction() {
+  if (await generateLocalPack()) {
     closeAllSetupModals();
   }
 }
@@ -2536,6 +2574,7 @@ if (window.location.protocol === "file:") {
   loadCardDatabase()
     .then((database) => {
       cardDatabase = database;
+      cardDatabaseCache.set(DEFAULT_THEME_ID, database);
       const defaultPack = createLocalPack({ playerCount: 6 });
       resetGameState(defaultPack);
       renderPack(defaultPack);
@@ -2545,6 +2584,7 @@ if (window.location.protocol === "file:") {
     .catch((error) => {
       console.error("cards.txt недоступен, используется встроенный резервный набор.", error);
       cardDatabase = createFallbackCardDatabase();
+      cardDatabaseCache.set(DEFAULT_THEME_ID, cardDatabase);
       const defaultPack = createLocalPack({ playerCount: 6 });
       resetGameState(defaultPack);
       renderPack(defaultPack);

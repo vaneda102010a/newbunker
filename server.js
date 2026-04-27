@@ -1,4 +1,5 @@
 const express = require("express");
+const fs = require("fs");
 const http = require("http");
 const path = require("path");
 const { Server } = require("socket.io");
@@ -31,6 +32,21 @@ app.get("/cards.txt", (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
   res.sendFile(path.join(PROJECT_ROOT, "cards.txt"));
+});
+
+app.get("/cards-fantasy.txt", (req, res) => {
+  const fileName = "cards Fantasy.txt";
+  const filePath = path.join(PROJECT_ROOT, fileName);
+
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+
+  if (!fs.existsSync(filePath)) {
+    res.status(404).send(`${fileName} not found`);
+    return;
+  }
+
+  res.sendFile(filePath);
 });
 
 app.get("/healthz", (req, res) => {
