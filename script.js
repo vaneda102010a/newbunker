@@ -118,6 +118,7 @@ const packSummary = document.querySelector("#packSummary");
 const characterGrid = document.querySelector("#characterGrid");
 const cardViewButton = document.querySelector("#cardViewButton");
 const tableViewButton = document.querySelector("#tableViewButton");
+const survivalButton = document.querySelector("#survivalButton");
 const gameLogList = document.querySelector("#gameLogList");
 const helpButton = document.querySelector("#helpButton");
 const settingsPanelButton = document.querySelector("#settingsPanelButton");
@@ -133,6 +134,10 @@ const votingList = document.querySelector("#votingList");
 const votingResults = document.querySelector("#votingResults");
 const votingFinishButton = document.querySelector("#votingFinishButton");
 const votingResetButton = document.querySelector("#votingResetButton");
+const survivalModal = document.querySelector("#survivalModal");
+const survivalCloseButton = document.querySelector("#survivalCloseButton");
+const survivalOkButton = document.querySelector("#survivalOkButton");
+const survivalResult = document.querySelector("#survivalResult");
 const createRoomButton = document.querySelector("#createRoomButton");
 const joinRoomButton = document.querySelector("#joinRoomButton");
 const roomNameInput = document.querySelector("#roomNameInput");
@@ -501,6 +506,7 @@ function applyRoomState({ room, currentUser }) {
     currentPack = null;
     characterGrid.innerHTML = "";
     updatePackSummary(null);
+    updateSurvivalButton();
     updateRoleControls();
     updateControlAvailability();
     renderGameLog();
@@ -1016,10 +1022,19 @@ function renderPack(pack) {
     updatePlayerNumberOptions();
   }
   renderCharacters(pack.players);
+  updateSurvivalButton();
 
   catastropheTabTitle.textContent = pack.catastrophe.title;
   catastropheTabText.innerHTML = formatCatastrophe(pack.catastrophe);
   bunkerTabText.innerHTML = formatBunker(pack.bunker);
+}
+
+function updateSurvivalButton() {
+  if (!survivalButton) {
+    return;
+  }
+
+  survivalButton.hidden = !canCalculateSurvival();
 }
 
 function renderCharacters(characters) {
@@ -1894,6 +1909,7 @@ function resetGameState(pack) {
   votingIsActive = false;
   votingResult = null;
   closeVotingModal();
+  closeSurvivalModal();
   closeAbilityModal();
   renderGameLog();
 }
@@ -1904,6 +1920,14 @@ function isGameOver() {
   }
 
   return getRemainingPlayers().length <= currentPack.bunker.availableSlots;
+}
+
+function canCalculateSurvival() {
+  if (!currentPack?.players?.length) {
+    return false;
+  }
+
+  return getRemainingPlayers().length === Number(currentPack.bunker?.availableSlots);
 }
 
 function getRemainingPlayers() {
@@ -2315,70 +2339,68 @@ function getGenderByRace(race) {
   return "Бесполый";
 }
 
-// ===== РАСЧЁТ ВЫЖИВАЕМОСТИ (ТОЛЬКО ДЛЯ ВЕДУЩЕГО) =====
-
-function calculateSurvival(players, user) {
-  if (!user || (user.role !== ROLE_HOST && user.role !== "host")) return null;
-
-  let score = 0;
-
-  const allItems = players.flatMap((p) => [String(p.largeInventory || ""), String(p.backpack || "")]).map((s) => s.toLowerCase());
-  const professions = players.map((p) => String(p.profession || "").toLowerCase());
-  const traits = players.map((p) => String(p.trait || "").toLowerCase());
-  const health = players.map((p) => String(p.health || "").toLowerCase());
-  const info = players.map((p) => String(p.additionalInfo || "").toLowerCase());
-
-  // РЕСУРСЫ
-  if (allItems.some((i) => i.includes("консервы") || i.includes("пайки"))) score += 50;
-  if (allItems.some((i) => i.includes("семена")) || professions.some((p) => p.includes("фермер"))) score += 50;
-  if (allItems.some((i) => i.includes("вода") || i.includes("фильтр"))) score += 50;
-
-  // ПРОФЕССИИ
-  if (professions.some((p) => p.includes("врач") || p.includes("мед"))) score += 75;
-  if (professions.some((p) => p.match(/инженер|механик|электрик|строитель/))) score += 75;
-  if (professions.some((p) => p.match(/охранник|военный|полицейский/))) score += 25;
-  if (professions.some((p) => p.match(/фермер|агроном|охотник/))) score += 25;
-
-  // ИНФА
-  if (info.some((i) => i.includes("образования"))) score += 25;
-  if (info.some((i) => i.includes("учёный") || i.includes("учен"))) score += 50;
-  if (info.some((i) => i.includes("катастрофе"))) score += 25;
-
-  // ОБОРУДОВАНИЕ
-  if (allItems.some((i) => i.includes("генератор") || i.includes("солнеч"))) score += 50;
-  if (allItems.some((i) => i.includes("инструмент"))) score += 25;
-  if (allItems.some((i) => i.includes("аптечка") || i.includes("мед"))) score += 25;
-
-  // ЗДОРОВЬЕ
-  health.forEach((h) => {
-    if (h.includes("идеальное") || h.includes("сильный иммунитет") || h.includes("иммунитет")) score += 10;
-    if (h.match(/рак|инсульт|тяжёл/)) score -= 50;
-    if (h.match(/психоз|шизофрени/)) score -= 40;
-  });
-
-  // ЧЕРТЫ
-  traits.forEach((t) => {
-    if (t.includes("лидер")) score += 25;
-    if (t.includes("работяга") || t.includes("работ")) score += 25;
-    if (t.includes("миротворец")) score += 25;
-    if (t.includes("конфликт")) score -= 25;
-    if (t.includes("ленив")) score -= 25;
-  });
-
-  // СИНЕРГИЯ
-  if (professions.some((p) => p.includes("фермер")) && allItems.some((i) => i.includes("семена"))) score += 50;
-  if (professions.some((p) => p.includes("врач")) && allItems.some((i) => i.includes("аптечка"))) score += 50;
-  if (professions.some((p) => p.match(/инженер|механик/)) && allItems.some((i) => i.includes("инструмент"))) score += 50;
-
-  // РЕЗУЛЬТАТ
-  let result = "";
-  if (score < 200) result = "Вы погибнете";
-  else if (score < 350) result = "Шансы низкие";
-  else if (score < 500) result = "Выживете с потерями";
-  else result = "Высокие шансы на выживание";
-
-  return { score, result };
-}
+const SURVIVAL_BASE_CHANCE = 50;
+const SURVIVAL_RULES = {
+  professionPositive: [
+    { points: 15, label: "медицинская роль", keywords: ["doctor", "врач", "медик", "медицин", "лекар"] },
+    { points: 12, label: "техническая роль", keywords: ["engineer", "mechanic", "electrician", "инженер", "механик", "электрик", "техник"] },
+    { points: 10, label: "еда и выращивание", keywords: ["farmer", "agronomist", "gardener", "фермер", "агроном", "садовод", "огород"] },
+    { points: 8, label: "готовка", keywords: ["cook", "chef", "повар", "шеф"] },
+    { points: 8, label: "пожарный или строитель", keywords: ["firefighter", "builder", "пожар", "строител"] },
+    { points: 6, label: "добыча еды", keywords: ["hunter", "fisherman", "охотник", "рыбак", "рыболов"] },
+    { points: 4, label: "психологическая поддержка", keywords: ["psychologist", "психолог"] }
+  ],
+  healthPositive: [
+    { points: 10, label: "идеальное здоровье", keywords: ["perfect health", "absolutely healthy", "идеальное здоровье", "абсолютно здоров"] },
+    { points: 8, label: "сильная выносливость", keywords: ["strong immunity", "high endurance", "сильный иммунитет", "высокая выносливость"] }
+  ],
+  itemPositive: [
+    { points: 10, label: "запас воды", keywords: ["water supply", "запас воды", "канистра воды", "бутылка воды"] },
+    { points: 10, label: "консервы", keywords: ["canned food", "консервы", "консерв"] },
+    { points: 10, label: "генератор", keywords: ["generator", "генератор"] },
+    { points: 8, label: "солнечная панель", keywords: ["solar panel", "солнечная панель", "солнеч"] },
+    { points: 8, label: "аптечка", keywords: ["medkit", "first aid", "аптечка"] },
+    { points: 8, label: "набор инструментов", keywords: ["tool set", "tools", "набор инструментов", "инструмент"] },
+    { points: 8, label: "семена или фермерские предметы", keywords: ["seeds", "farming", "семена", "садовый", "фермер"] },
+    { points: 6, label: "фильтр воды", keywords: ["water filter", "фильтр воды", "фильтр"] },
+    { points: 5, label: "связь", keywords: ["radio", "communication", "рация", "радио", "связь"] },
+    { points: 4, label: "свет", keywords: ["flashlight", "batteries", "фонар", "батар"] }
+  ],
+  traitPositive: [
+    { points: 6, label: "трудолюбие", keywords: ["hard worker", "трудолюб", "работяг"] },
+    { points: 5, label: "лидерство", keywords: ["leader", "лидер"] },
+    { points: 4, label: "спокойствие", keywords: ["calm", "peaceful", "спокой", "мирн", "миротвор"] }
+  ],
+  healthNegative: [
+    { points: -20, label: "критическое здоровье", keywords: ["cancer", "psychosis", "schizophrenia", "dementia", "рак", "психоз", "шизофрен", "деменц"] },
+    { points: -15, label: "серьезная хроническая болезнь", keywords: ["serious chronic", "тяжелая хроническая", "тяжёлая хроническая", "серьезная хроническая", "серьёзная хроническая"] },
+    { points: -10, label: "значимые ограничения здоровья", keywords: ["asthma", "diabetes", "obesity 2", "obesity 3", "ptsd", "астма", "диабет", "ожирение 2", "ожирение 3", "птср"] },
+    { points: -5, label: "незначительные проблемы здоровья", keywords: ["minor", "легкая", "лёгкая", "слабая", "незнач"] }
+  ],
+  traitNegative: [
+    { points: -10, label: "конфликтность", keywords: ["conflict", "paranoid", "chaotic", "конфликт", "парано", "хаот"] },
+    { points: -8, label: "ненадежность", keywords: ["greedy", "coward", "жадн", "трус"] },
+    { points: -6, label: "лень", keywords: ["lazy", "ленив", "лень"] }
+  ],
+  phobiaNegative: [
+    { points: -12, label: "клаустрофобия", keywords: ["claustrophobia", "клаустрофоб"] },
+    { points: -10, label: "страх темноты", keywords: ["fear of darkness", "страх темноты", "темнот"] },
+    { points: -8, label: "страх громких звуков", keywords: ["fear of loud sounds", "громких звуков", "шума", "громк"] },
+    { points: -6, label: "страх людей или изоляции", keywords: ["fear of people", "isolation", "страх людей", "изоляц", "социофоб"] }
+  ],
+  infoNegative: [
+    { points: -12, label: "убийство", keywords: ["killed someone", "убил", "убила", "убий"] },
+    { points: -10, label: "патологическая ложь", keywords: ["pathological liar", "патологический лжец", "лжец", "лгун"] },
+    { points: -8, label: "враг другого игрока", keywords: ["enemy of another player", "враг другого игрока", "враг игрок"] },
+    { points: -6, label: "тюрьма", keywords: ["was in prison", "prison", "сидел", "тюрьм", "заключ"] }
+  ],
+  groupPenalties: [
+    { points: -15, label: "нет медицинской роли", test: (ctx) => !ctx.hasMedicalRole },
+    { points: -15, label: "нет технической роли", test: (ctx) => !ctx.hasTechnicalRole },
+    { points: -10, label: "нет роли для еды", test: (ctx) => !ctx.hasFoodRole },
+    { points: -10, label: "нет полезных предметов", test: (ctx) => !ctx.hasUsefulItems }
+  ]
+};
 
 // Возвращает случайное целое между min и max включительно
 function getRandomInt(min, max) {
@@ -2619,6 +2641,214 @@ function formatVotingWinnerLog(result) {
 function closeVotingModal() {
   if (votingModal) {
     votingModal.hidden = true;
+  }
+}
+
+function handleSurvivalCalculation() {
+  if (!canCalculateSurvival()) {
+    setStatus("Расчет доступен, когда осталось игроков ровно по количеству мест в бункере.", "error");
+    return;
+  }
+
+  addGameLog("Начат расчет выживания");
+  const result = calculateSurvivalChance(getRemainingPlayers());
+  addGameLog(`Результат: ${result.chance}%`);
+  addGameLog(result.mvp ? `Самый полезный: Игрок ${result.mvp.number}` : "Самый полезный: не найден");
+  addGameLog(result.riskPlayer ? `Риск: Игрок ${result.riskPlayer.number}` : "Риск: не найден");
+  renderGameLog();
+  renderSurvivalResult(result);
+  openSurvivalModal();
+  syncHostState();
+}
+
+function calculateSurvivalChance(players) {
+  const playerScores = players.map((player) => ({
+    player,
+    positive: 0,
+    negative: 0,
+    positives: [],
+    negatives: []
+  }));
+  const strengths = [];
+  const weaknesses = [];
+
+  playerScores.forEach((entry) => {
+    applySurvivalRules(entry, "profession", SURVIVAL_RULES.professionPositive, strengths, { firstMatch: true });
+    applySurvivalRules(entry, "health", SURVIVAL_RULES.healthPositive, strengths);
+    applySurvivalRules(entry, "trait", SURVIVAL_RULES.traitPositive, strengths, { firstMatch: true });
+    applySurvivalRules(entry, "health", SURVIVAL_RULES.healthNegative, weaknesses, { firstMatch: true });
+    applySurvivalRules(entry, "trait", SURVIVAL_RULES.traitNegative, weaknesses, { firstMatch: true });
+    applySurvivalRules(entry, "phobia", SURVIVAL_RULES.phobiaNegative, weaknesses, { firstMatch: true });
+    applySurvivalRules(entry, "additionalInfo", SURVIVAL_RULES.infoNegative, weaknesses);
+  });
+
+  const itemContext = applyItemSurvivalRules(players, playerScores, strengths);
+  const groupContext = {
+    hasMedicalRole: players.some((player) => matchesAnyKeyword(player.profession, ["doctor", "врач", "медик", "медицин", "лекар"])),
+    hasTechnicalRole: players.some((player) => matchesAnyKeyword(player.profession, ["engineer", "mechanic", "electrician", "инженер", "механик", "электрик", "техник"])),
+    hasFoodRole: players.some((player) => matchesAnyKeyword(player.profession, ["farmer", "agronomist", "gardener", "cook", "chef", "hunter", "fisherman", "фермер", "агроном", "садовод", "повар", "охотник", "рыбак", "рыболов"])),
+    hasUsefulItems: itemContext.hasUsefulItems
+  };
+  const groupPenalty = applyGroupSurvivalPenalties(groupContext, weaknesses);
+  const positiveScore = playerScores.reduce((sum, entry) => sum + entry.positive, 0);
+  const negativeScore = playerScores.reduce((sum, entry) => sum + entry.negative, 0) + groupPenalty;
+  const chance = clampSurvivalChance(SURVIVAL_BASE_CHANCE + positiveScore + negativeScore);
+  const mvpEntry = playerScores.reduce((best, entry) => entry.positive > (best?.positive || 0) ? entry : best, null);
+  const riskEntry = playerScores.reduce((worst, entry) => entry.negative < (worst?.negative || 0) ? entry : worst, null);
+
+  return {
+    chance,
+    status: getSurvivalStatus(chance),
+    strengths: strengths.length ? strengths : ["Сильные стороны не обнаружены"],
+    weaknesses: weaknesses.length ? weaknesses : ["Критичных слабостей не обнаружено"],
+    mvp: mvpEntry?.positive > 0 ? mvpEntry.player : null,
+    mvpScore: mvpEntry?.positive || 0,
+    riskPlayer: riskEntry?.negative < 0 ? riskEntry.player : null,
+    riskScore: riskEntry?.negative || 0
+  };
+}
+
+function applySurvivalRules(entry, field, rules, output, options = {}) {
+  rules.some((rule) => {
+    if (!matchesAnyKeyword(entry.player[field], rule.keywords)) {
+      return false;
+    }
+
+    const message = `Игрок ${entry.player.number}: ${rule.label} (${formatSignedPoints(rule.points)})`;
+    output.push(message);
+
+    if (rule.points > 0) {
+      entry.positive += rule.points;
+      entry.positives.push(message);
+    } else {
+      entry.negative += rule.points;
+      entry.negatives.push(message);
+    }
+
+    return Boolean(options.firstMatch);
+  });
+}
+
+function applyItemSurvivalRules(players, playerScores, strengths) {
+  let hasUsefulItems = false;
+
+  SURVIVAL_RULES.itemPositive.forEach((rule) => {
+    const owner = players.find((player) => matchesAnyKeyword(`${player.largeInventory || ""} ${player.backpack || ""}`, rule.keywords));
+
+    if (!owner) {
+      return;
+    }
+
+    const entry = playerScores.find((candidate) => candidate.player.number === owner.number);
+    const message = `Игрок ${owner.number}: ${rule.label} (${formatSignedPoints(rule.points)})`;
+    hasUsefulItems = true;
+    strengths.push(message);
+    if (entry) {
+      entry.positive += rule.points;
+      entry.positives.push(message);
+    }
+  });
+
+  return { hasUsefulItems };
+}
+
+function applyGroupSurvivalPenalties(context, weaknesses) {
+  return SURVIVAL_RULES.groupPenalties.reduce((sum, rule) => {
+    if (!rule.test(context)) {
+      return sum;
+    }
+
+    weaknesses.push(`Группа: ${rule.label} (${formatSignedPoints(rule.points)})`);
+    return sum + rule.points;
+  }, 0);
+}
+
+function matchesAnyKeyword(value, keywords) {
+  const text = normalizeSurvivalText(value);
+  return keywords.some((keyword) => text.includes(normalizeSurvivalText(keyword)));
+}
+
+function normalizeSurvivalText(value) {
+  return cleanText(value, "")
+    .toLowerCase()
+    .replace(/ё/g, "е");
+}
+
+function formatSignedPoints(points) {
+  return `${points > 0 ? "+" : ""}${points}`;
+}
+
+function clampSurvivalChance(value) {
+  return Math.min(99, Math.max(1, Math.round(value)));
+}
+
+function getSurvivalStatus(chance) {
+  if (chance <= 25) {
+    return "Почти обречены";
+  }
+
+  if (chance <= 45) {
+    return "Очень тяжело";
+  }
+
+  if (chance <= 65) {
+    return "Есть шанс";
+  }
+
+  if (chance <= 80) {
+    return "Хорошие шансы";
+  }
+
+  return "Почти идеальная группа";
+}
+
+function renderSurvivalResult(result) {
+  if (!survivalResult) {
+    return;
+  }
+
+  survivalResult.innerHTML = `
+    <div class="survival-score">
+      <strong>${result.chance}%</strong>
+      <span>${escapeHtml(result.status)}</span>
+    </div>
+    <div class="survival-summary-grid">
+      <section>
+        <h4>Сильные стороны</h4>
+        ${renderSurvivalList(result.strengths)}
+      </section>
+      <section>
+        <h4>Слабые стороны</h4>
+        ${renderSurvivalList(result.weaknesses)}
+      </section>
+    </div>
+    <div class="survival-key-points">
+      <div>
+        <span>Самый полезный игрок</span>
+        <strong>${result.mvp ? `Игрок ${result.mvp.number}` : "Не найден"}</strong>
+      </div>
+      <div>
+        <span>Самый опасный риск</span>
+        <strong>${result.riskPlayer ? `Игрок ${result.riskPlayer.number}` : "Не найден"}</strong>
+      </div>
+    </div>
+  `;
+}
+
+function renderSurvivalList(items) {
+  return `<ul>${items.slice(0, 12).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
+}
+
+function openSurvivalModal() {
+  if (survivalModal) {
+    survivalModal.hidden = false;
+    survivalOkButton?.focus();
+  }
+}
+
+function closeSurvivalModal() {
+  if (survivalModal) {
+    survivalModal.hidden = true;
   }
 }
 
@@ -2901,6 +3131,7 @@ settingsPanelButton?.addEventListener("click", () => openSetupModal("gameSetting
 roomPanelButton?.addEventListener("click", () => openSetupModal("roomSetupModal"));
 rolePanelButton?.addEventListener("click", () => openSetupModal("roleSetupModal"));
 votingButton?.addEventListener("click", () => openVotingModal(true));
+survivalButton?.addEventListener("click", handleSurvivalCalculation);
 setupModals.forEach((modal) => {
   modal.addEventListener("click", (event) => {
     if (event.target === modal || event.target.closest("[data-close-setup]")) {
@@ -2949,11 +3180,19 @@ votingModal?.addEventListener("click", (event) => {
     closeVotingModal();
   }
 });
+survivalCloseButton?.addEventListener("click", closeSurvivalModal);
+survivalOkButton?.addEventListener("click", closeSurvivalModal);
+survivalModal?.addEventListener("click", (event) => {
+  if (event.target === survivalModal) {
+    closeSurvivalModal();
+  }
+});
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closeAllSetupModals();
     closeVotingModal();
+    closeSurvivalModal();
     closeHelpPanel();
   }
 });

@@ -71,9 +71,12 @@
       <div class="content-container">
         <section class="pack-heading">
           <h2>Сгенерированный пак</h2>
-          <div class="view-toggle" role="group" aria-label="Вид игроков">
-            <button class="view-toggle-button" id="cardViewButton" type="button" data-view="cards" aria-pressed="false">Карточки</button>
-            <button class="view-toggle-button active" id="tableViewButton" type="button" data-view="table" aria-pressed="true">Таблица</button>
+          <div class="pack-heading-actions">
+            <button class="survival-button" id="survivalButton" type="button" hidden>Рассчитать шанс выживания</button>
+            <div class="view-toggle" role="group" aria-label="Вид игроков">
+              <button class="view-toggle-button" id="cardViewButton" type="button" data-view="cards" aria-pressed="false">Карточки</button>
+              <button class="view-toggle-button active" id="tableViewButton" type="button" data-view="table" aria-pressed="true">Таблица</button>
+            </div>
           </div>
         </section>
 
@@ -231,6 +234,18 @@
       <div class="modal-actions">
         <button class="main-button" id="votingFinishButton" type="button">Завершить</button>
         <button class="ghost-button" id="votingResetButton" type="button">Новое</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="survivalModal" hidden>
+    <div class="confirm-modal survival-modal" role="dialog" aria-modal="true" aria-labelledby="survivalTitle">
+      <button class="modal-close-button" id="survivalCloseButton" type="button" aria-label="Закрыть">×</button>
+      <span class="eyebrow">Финал</span>
+      <h3 id="survivalTitle">Результат выживания</h3>
+      <div class="survival-result" id="survivalResult"></div>
+      <div class="modal-actions single-action">
+        <button class="main-button" id="survivalOkButton" type="button">Готово</button>
       </div>
     </div>
   </div>
