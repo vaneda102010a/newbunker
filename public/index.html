@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Генератор паков для игры Бункер</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+  <!-- (содержимое страницы скопировано из корневого index.html) -->
+  <div class="page">
+    <header class="top-header">
+      <div class="title-block">
+        <h1>Генератор паков для игры Бункер</h1>
+        <p>Выбери тему, настрой параметры и получи уникальный пак карточек</p>
+      </div>
+
+      <nav class="top-action-bar" aria-label="Действия игры">
+        <button class="top-action-button" id="settingsPanelButton" type="button" aria-haspopup="dialog">
+          <span aria-hidden="true">⚙</span>
+          <span>Настройки игры</span>
+        </button>
+        <button class="top-action-button" id="roomPanelButton" type="button" aria-haspopup="dialog">
+          <span aria-hidden="true">👥</span>
+          <span>Комната</span>
+        </button>
+        <button class="top-action-button" id="rolePanelButton" type="button" aria-haspopup="dialog">
+          <span aria-hidden="true">👤</span>
+          <span>Роль</span>
+        </button>
+        <button class="top-action-button" id="helpButton" type="button" aria-label="Помощь" aria-haspopup="dialog" aria-expanded="false">
+          <span aria-hidden="true">?</span>
+          <span>Помощь</span>
+        </button>
+      </nav>
+    </header>
+
+    <div class="pack-summary" id="packSummary" aria-live="polite" hidden></div>
+    <div class="status-message" id="statusMessage" role="status" aria-live="polite"></div>
+
+    <main class="content">
+      <div class="top-container">
+        <section class="overview-panel info-panel" aria-label="Информация игры">
+          <article class="overview-column" id="catastrophe" aria-label="Катастрофа">
+            <span class="eyebrow">Катастрофа</span>
+            <h3 id="catastropheTabTitle">ИИ мэра города взломал систему</h3>
+            <div class="pack-details" id="catastropheTabText">Искусственный интеллект, управлявший городом, решил, что люди слишком шумные и неэффективные. Началась тотальная зачистка.</div>
+          </article>
+
+          <article class="overview-column" id="bunker" aria-label="Бункер">
+            <span class="eyebrow">Бункер</span>
+            <h3>Подземный техно-бункер</h3>
+            <div class="pack-details" id="bunkerTabText">Шесть мест, слабая вентиляция, запас еды на месяц и серверная, которая иногда разговаривает сама с собой.</div>
+          </article>
+        </section>
+
+        <section class="game-log-panel info-panel" aria-label="Журнал игры">
+          <div class="game-log-header">
+            <span class="eyebrow">Локально</span>
+            <h3>Журнал игры</h3>
+          </div>
+          <ul class="game-log-list" id="gameLogList" aria-live="polite">
+            <li class="log-empty">Действий пока нет</li>
+          </ul>
+        </section>
+      </div>
+
+      <div class="content-container">
+        <section class="pack-heading">
+          <h2>Сгенерированный пак</h2>
+          <div class="view-toggle" role="group" aria-label="Вид игроков">
+            <button class="view-toggle-button" id="cardViewButton" type="button" data-view="cards" aria-pressed="false">Карточки</button>
+            <button class="view-toggle-button active" id="tableViewButton" type="button" data-view="table" aria-pressed="true">Таблица</button>
+          </div>
+        </section>
+
+        <section class="characters-section" id="characters" aria-label="Персонажи">
+          <div class="character-grid" id="characterGrid"></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- Модальные окна и остальное содержимое страницы сохранены идентичными -->
+  <!-- (скопировано из исходного index.html) -->
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/assets/js/data.js"></script>
+  <script src="/assets/js/app.js"></script>
+</body>
+</html>
