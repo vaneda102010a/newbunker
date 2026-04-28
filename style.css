@@ -55,6 +55,48 @@ body::before {
   -webkit-backdrop-filter: blur(1.5px);
 }
 
+body.theme-fantasy {
+  background: url("/images/fanta.jpg") no-repeat center center fixed;
+  background-size: cover;
+  position: relative;
+}
+
+body.theme-fantasy::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 0;
+  pointer-events: none;
+}
+
+#root,
+.app-container {
+  position: relative;
+  z-index: 1;
+}
+
+.fantasy-particles {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(120, 80, 255, 0.3) 1px, transparent 1px);
+  background-size: 120px 120px;
+  animation: moveParticles 60s linear infinite;
+  opacity: 0.25;
+}
+
+@keyframes moveParticles {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(-200px);
+  }
+}
+
 button,
 select {
   font: inherit;
@@ -636,6 +678,94 @@ button:focus-visible {
 
 .game-log-list .log-empty {
   color: var(--muted-2);
+}
+
+.theme-fantasy {
+  color: #e8ecff;
+}
+
+.theme-fantasy .muted {
+  color: #aeb6d8;
+}
+
+.theme-fantasy .room-panel,
+.theme-fantasy .role-panel,
+.theme-fantasy .control-panel,
+.theme-fantasy .info-panel,
+.theme-fantasy .character-card,
+.theme-fantasy .confirm-modal,
+.theme-fantasy .pack-summary,
+.theme-fantasy .setup-modal,
+.theme-fantasy .help-panel,
+.theme-fantasy .players-table-wrap,
+.theme-fantasy .table-container {
+  background: rgba(8, 10, 25, 0.72);
+  border: 1px solid rgba(120, 80, 255, 0.45);
+  box-shadow: 0 0 22px rgba(80, 70, 255, 0.25);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 16px;
+}
+
+.theme-fantasy .overview-column + .overview-column {
+  border-left-color: rgba(120, 80, 255, 0.24);
+}
+
+.theme-fantasy .pack-details,
+.theme-fantasy .title-block p,
+.theme-fantasy .status-message,
+.theme-fantasy .field span,
+.theme-fantasy .eyebrow,
+.theme-fantasy .game-log-list .log-empty {
+  color: #aeb6d8;
+}
+
+.theme-fantasy table,
+.theme-fantasy .players-table {
+  background: rgba(10, 12, 30, 0.6);
+  color: #e8ecff;
+}
+
+.theme-fantasy th,
+.theme-fantasy .players-table thead th,
+.theme-fantasy .players-table thead th:first-child {
+  background: linear-gradient(135deg, #1a1f4d, #3b2a7a);
+  color: #e8ecff;
+}
+
+.theme-fantasy td,
+.theme-fantasy .players-table th,
+.theme-fantasy .players-table td {
+  border-color: rgba(120, 80, 255, 0.2);
+}
+
+.theme-fantasy .players-table tbody tr,
+.theme-fantasy .players-table tbody tr:nth-child(even),
+.theme-fantasy .players-table-number,
+.theme-fantasy .players-table-player {
+  background: rgba(10, 12, 30, 0.48);
+}
+
+.theme-fantasy .players-table tbody tr:hover {
+  background:
+    linear-gradient(90deg, rgba(120, 80, 255, 0.18), transparent 54%),
+    rgba(22, 24, 58, 0.68);
+}
+
+.theme-fantasy button {
+  background: linear-gradient(135deg, #243bff, #8b3dff);
+  border: 1px solid rgba(170, 140, 255, 0.7);
+  box-shadow: 0 0 12px rgba(120, 80, 255, 0.45);
+  color: white;
+}
+
+.theme-fantasy button:hover {
+  box-shadow: 0 0 18px rgba(150, 120, 255, 0.7);
+  transform: translateY(-1px);
+}
+
+.theme-fantasy button:disabled {
+  transform: none;
 }
 
 .characters-section {

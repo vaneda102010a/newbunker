@@ -14,7 +14,8 @@ const STATIC_FILES = {
   "/script.js": "script.js",
   "/style.css": "style.css",
   "/data.js": "data.js",
-  "/images/bunker-bg.jpg": "public/images/bunker-bg.jpg"
+  "/images/bunker-bg.jpg": "public/images/bunker-bg.jpg",
+  "/images/fanta.jpg": "public/images/fanta.jpg"
 };
 const rooms = new Map();
 

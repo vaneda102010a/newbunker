@@ -160,6 +160,7 @@ const abilityTraitSelect = document.querySelector("#abilityTraitSelect");
 const abilityAdminNote = document.querySelector("#abilityAdminNote");
 const abilityConfirmButton = document.querySelector("#abilityConfirmButton");
 const abilityCancelButton = document.querySelector("#abilityCancelButton");
+const appContainer = document.querySelector(".app-container, .page");
 
 let cardDatabase = createEmptyCardDatabase();
 let currentPack = null;
@@ -213,6 +214,26 @@ function getThemeById(themeId) {
 
 function getSelectedTheme() {
   return getThemeById(themeSelect?.value || DEFAULT_THEME_ID);
+}
+
+function setActiveTheme(themeId) {
+  const isFantasy = getThemeById(themeId).id === "fantasy";
+  document.body.classList.toggle("theme-fantasy", isFantasy);
+  appContainer?.classList.toggle("theme-fantasy", isFantasy);
+
+  let particles = document.querySelector(".fantasy-particles");
+  if (isFantasy && !particles) {
+    particles = document.createElement("div");
+    particles.className = "fantasy-particles";
+    particles.setAttribute("aria-hidden", "true");
+    document.body.append(particles);
+  } else if (!isFantasy && particles) {
+    particles.remove();
+  }
+}
+
+function applySelectedTheme() {
+  setActiveTheme(getSelectedTheme().id);
 }
 
 function getSettings() {
@@ -974,6 +995,11 @@ function updateViewToggle() {
 
 function renderPack(pack) {
   currentPack = pack;
+  const packThemeId = getThemeById(pack.settings?.theme || pack.themeId || themeSelect?.value || DEFAULT_THEME_ID).id;
+  if (themeSelect && themeSelect.value !== packThemeId) {
+    themeSelect.value = packThemeId;
+  }
+  setActiveTheme(packThemeId);
   updatePackSummary(pack);
   if (!isOnlineRoom()) {
     currentPlayerNumber = clampPlayerNumber(currentPlayerNumber);
@@ -2527,6 +2553,7 @@ function selectRandomTheme() {
 
   const randomIndex = Math.floor(Math.random() * themeSelect.options.length);
   themeSelect.selectedIndex = randomIndex;
+  applySelectedTheme();
   setStatus("Случайная тема выбрана. Нажми «Сгенерировать пак».", "");
 }
 
@@ -2716,9 +2743,11 @@ playerCountSelect.addEventListener("change", () => {
   currentPlayerNumber = clampPlayerNumber(currentPlayerNumber);
   updatePlayerNumberOptions();
 });
+themeSelect?.addEventListener("change", applySelectedTheme);
 
 setGenerationReady(false);
 renderThemeOptions();
+applySelectedTheme();
 updateRoleControls();
 updateViewToggle();
 
