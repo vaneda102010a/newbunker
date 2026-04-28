@@ -123,9 +123,16 @@ const helpButton = document.querySelector("#helpButton");
 const settingsPanelButton = document.querySelector("#settingsPanelButton");
 const roomPanelButton = document.querySelector("#roomPanelButton");
 const rolePanelButton = document.querySelector("#rolePanelButton");
+const votingButton = document.querySelector("#votingButton");
 const setupModals = document.querySelectorAll("[data-setup-modal]");
 const helpModal = document.querySelector("#helpModal");
 const helpCloseButton = document.querySelector("#helpCloseButton");
+const votingModal = document.querySelector("#votingModal");
+const votingCloseButton = document.querySelector("#votingCloseButton");
+const votingList = document.querySelector("#votingList");
+const votingResults = document.querySelector("#votingResults");
+const votingFinishButton = document.querySelector("#votingFinishButton");
+const votingResetButton = document.querySelector("#votingResetButton");
 const createRoomButton = document.querySelector("#createRoomButton");
 const joinRoomButton = document.querySelector("#joinRoomButton");
 const roomNameInput = document.querySelector("#roomNameInput");
@@ -183,6 +190,9 @@ let roomPlayers = [];
 let characterView = getSavedCharacterView();
 let pendingCreateRoomName = "";
 let pendingApprovedRequest = null;
+let votingVotes = {};
+let votingIsActive = false;
+let votingResult = null;
 const handledAbilityRequests = new Set();
 const cardDatabaseCache = new Map();
 
@@ -1060,7 +1070,7 @@ function renderCharacters(characters) {
   if (newlyRevealedTraitKeys.size > 0) {
     window.setTimeout(() => {
       newlyRevealedTraitKeys.clear();
-    }, 240);
+    }, 980);
   }
 }
 
@@ -1097,11 +1107,11 @@ function renderPlayerTableRow(character, gameIsOver) {
   const playerTitle = getTablePlayerTitle(character);
 
   return `
-    <tr class="${isExcluded ? "excluded" : ""}${isOwn ? " own-row" : ""}" style="--accent: ${character.accent}">
+    <tr class="${isExcluded ? "excluded" : ""}${isOwn ? " own-row" : ""}" style="--accent: ${character.accent}" data-player="${character.number}">
       <th class="players-table-number" scope="row">${character.number}</th>
       <td class="players-table-player" title="${escapeHtml(playerTitle)}">${renderPlayerTableSlot(character, isExcluded, gameIsOver)}</td>
-      ${tableTraits.map((trait) => `
-        <td class="players-table-cell trait-${trait.key}" title="${escapeHtml(getTableTraitTitle(character, trait))}">
+      ${tableTraits.map((trait, columnIndex) => `
+        <td class="players-table-cell trait-${trait.key}${isNewlyRevealedTrait(character.number, trait.key) ? " revealed-now-cell" : ""}" data-column="${columnIndex + 2}" title="${escapeHtml(getTableTraitTitle(character, trait))}">
           ${renderTraitValue(character, trait)}
         </td>
       `).join("")}
@@ -1168,9 +1178,10 @@ function renderCardTitle(character) {
 function renderTraitRow(character, trait) {
   const value = renderTraitValue(character, trait);
   const icon = traitIcons[trait.key] || "•";
+  const revealClass = isNewlyRevealedTrait(character.number, trait.key) ? " revealed-now-row" : "";
 
   return `
-    <div class="trait-row trait-${trait.key}">
+    <div class="trait-row trait-${trait.key}${revealClass}">
       <dt><span class="trait-label-icon" aria-hidden="true">${icon}</span><span>${trait.label}</span></dt>
       <dd>${value}</dd>
     </div>
@@ -1224,7 +1235,7 @@ function renderHostHiddenTraitControls(playerNumber, trait) {
 function renderVisibleTraitValue(character, trait, isPublic) {
   let value;
   const tone = getTraitTone(character, trait);
-  const revealClass = newlyRevealedTraitKeys.has(getTraitRevealKey(character.number, trait.key))
+  const revealClass = isNewlyRevealedTrait(character.number, trait.key)
     ? " revealed-now"
     : "";
 
@@ -1692,6 +1703,10 @@ function getTraitRevealKey(playerNumber, traitKey) {
   return `${playerNumber}:${traitKey}`;
 }
 
+function isNewlyRevealedTrait(playerNumber, traitKey) {
+  return newlyRevealedTraitKeys.has(getTraitRevealKey(playerNumber, traitKey));
+}
+
 function markNewlyRevealedTraits(nextRevealedTraits) {
   Object.entries(nextRevealedTraits).forEach(([playerNumber, traits]) => {
     Object.keys(traits || {}).forEach((traitKey) => {
@@ -1708,7 +1723,11 @@ function revealTrait(playerNumber, traitKey) {
     return;
   }
 
-  setTraitRevealed(playerNumber, traitKey);
+  const wasOpened = setTraitRevealed(playerNumber, traitKey);
+  if (wasOpened) {
+    addGameLog(`Открыта характеристика Игрока ${playerNumber}: ${getTraitAccusative(traitKey)}`);
+    renderGameLog();
+  }
   renderPack(currentPack);
 }
 
@@ -1723,19 +1742,24 @@ function revealAllTraits(playerNumber) {
   }
 
   setAllTraitsRevealed(playerNumber);
+  addGameLog(`Открыты все характеристики Игрока ${playerNumber}`);
+  renderGameLog();
   renderPack(currentPack);
 }
 
 function setTraitRevealed(playerNumber, traitKey) {
+  const wasHidden = !revealedTraits[playerNumber]?.[traitKey];
+
   if (!revealedTraits[playerNumber]) {
     revealedTraits[playerNumber] = {};
   }
 
-  if (!revealedTraits[playerNumber][traitKey]) {
+  if (wasHidden) {
     newlyRevealedTraitKeys.add(getTraitRevealKey(playerNumber, traitKey));
   }
 
   revealedTraits[playerNumber][traitKey] = true;
+  return wasHidden;
 }
 
 function setAllTraitsRevealed(playerNumber) {
@@ -1866,6 +1890,10 @@ function resetGameState(pack) {
   protectedPlayers = new Set();
   gameLog = [];
   pendingAbility = null;
+  votingVotes = {};
+  votingIsActive = false;
+  votingResult = null;
+  closeVotingModal();
   closeAbilityModal();
   renderGameLog();
 }
@@ -2428,6 +2456,172 @@ function getTraitAccusative(traitKey) {
   return labels[traitKey] || "характеристику";
 }
 
+function getVotingPlayers() {
+  return currentPack?.players || [];
+}
+
+function getVotingEligiblePlayers() {
+  return getVotingPlayers().filter((player) => !excludedPlayers.has(player.number));
+}
+
+function getVotingPlayerLabel(playerNumber) {
+  const player = getPlayerByNumber(playerNumber);
+  const slotName = getRoomPlayerForSlot(playerNumber)?.name || "";
+  const name = slotName || (isOwnPlayer(playerNumber) && currentPlayerName) || `Игрок ${playerNumber}`;
+  const profession = player && canViewTrait(playerNumber, "profession") ? cleanText(player.profession, "") : "";
+
+  return profession ? `${name} · ${profession}` : name;
+}
+
+function openVotingModal(resetSession = false) {
+  if (!currentPack?.players?.length) {
+    setStatus("Сначала сгенерируйте пак.", "error");
+    return;
+  }
+
+  if (resetSession || !votingIsActive) {
+    startVotingSession();
+  }
+
+  renderVotingModal();
+  votingModal.hidden = false;
+}
+
+function startVotingSession() {
+  votingVotes = {};
+  votingResult = null;
+  votingIsActive = true;
+  addGameLog("Голосование началось");
+  renderGameLog();
+  syncHostState();
+}
+
+function renderVotingModal() {
+  if (!votingList || !votingResults) {
+    return;
+  }
+
+  const players = getVotingPlayers();
+  const targets = getVotingEligiblePlayers();
+  votingList.innerHTML = players.map((player) => renderVotingRow(player, targets)).join("");
+
+  if (votingResult) {
+    votingResults.hidden = false;
+    votingResults.innerHTML = renderVotingResults(votingResult);
+  } else {
+    votingResults.hidden = true;
+    votingResults.innerHTML = "";
+  }
+
+  votingFinishButton.disabled = targets.length < 2;
+}
+
+function renderVotingRow(player, targets) {
+  const isExcluded = excludedPlayers.has(player.number);
+  const selectedTarget = votingVotes[player.number] || "";
+  const options = [
+    `<option value="">Не голосовал</option>`,
+    ...targets
+      .filter((target) => target.number !== player.number)
+      .map((target) => {
+        const selected = Number(selectedTarget) === target.number ? "selected" : "";
+        return `<option value="${target.number}" ${selected}>Игрок ${target.number}</option>`;
+      })
+  ].join("");
+
+  return `
+    <label class="voting-row${isExcluded ? " excluded" : ""}">
+      <span>${escapeHtml(getVotingPlayerLabel(player.number))}${isExcluded ? " · исключен" : ""}</span>
+      <select data-vote-player="${player.number}" ${isExcluded ? "disabled" : ""}>
+        ${options}
+      </select>
+    </label>
+  `;
+}
+
+function finishVoting() {
+  if (!votingIsActive || !currentPack?.players?.length) {
+    return;
+  }
+
+  votingResult = calculateVotingResult();
+  votingIsActive = false;
+  addGameLog(formatVotingSummaryLog(votingResult));
+  addGameLog(formatVotingWinnerLog(votingResult));
+  renderVotingModal();
+  renderGameLog();
+  syncHostState();
+}
+
+function calculateVotingResult() {
+  const candidates = getVotingEligiblePlayers();
+  const counts = candidates.reduce((result, player) => {
+    result[player.number] = 0;
+    return result;
+  }, {});
+
+  Object.values(votingVotes).forEach((targetNumber) => {
+    const number = Number(targetNumber);
+    if (counts[number] !== undefined) {
+      counts[number] += 1;
+    }
+  });
+
+  const maxVotes = Math.max(0, ...Object.values(counts));
+  const winners = Object.entries(counts)
+    .filter(([, count]) => count === maxVotes && maxVotes > 0)
+    .map(([playerNumber]) => Number(playerNumber));
+
+  return { counts, maxVotes, winners };
+}
+
+function renderVotingResults(result) {
+  const rows = Object.entries(result.counts)
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([playerNumber, count]) => {
+      const isWinner = result.winners.includes(Number(playerNumber));
+      return `
+        <div class="voting-result-row${isWinner ? " winner" : ""}">
+          <span>Игрок ${playerNumber}</span>
+          <strong>${count}</strong>
+        </div>
+      `;
+    })
+    .join("");
+
+  const winnerText = result.winners.length
+    ? `Больше всего голосов: ${result.winners.map((number) => `Игрок ${number}`).join(", ")}`
+    : "Голоса не поданы";
+
+  return `
+    <div class="voting-result-title">${escapeHtml(winnerText)}</div>
+    ${rows}
+  `;
+}
+
+function formatVotingSummaryLog(result) {
+  const details = Object.entries(result.counts)
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([playerNumber, count]) => `Игрок ${playerNumber}: ${count}`)
+    .join("; ");
+
+  return `Голосование завершено: ${details || "голосов нет"}`;
+}
+
+function formatVotingWinnerLog(result) {
+  if (!result.winners.length) {
+    return "Больше всего голосов: нет";
+  }
+
+  return `Больше всего голосов: ${result.winners.map((number) => `Игрок ${number}`).join(", ")} (${result.maxVotes})`;
+}
+
+function closeVotingModal() {
+  if (votingModal) {
+    votingModal.hidden = true;
+  }
+}
+
 function addGameLog(message) {
   gameLog.push(message);
 }
@@ -2569,6 +2763,48 @@ function closeActiveAbilityTooltips(exceptButton = null) {
   });
 }
 
+function clearPlayersTableHover(table) {
+  table?.querySelectorAll(".row-hover, .column-hover").forEach((element) => {
+    element.classList.remove("row-hover", "column-hover");
+  });
+}
+
+function applyPlayersTableHover(cell) {
+  const table = cell.closest(".players-table");
+  const row = cell.closest("tr");
+
+  if (!table || !row) {
+    return;
+  }
+
+  clearPlayersTableHover(table);
+  row.classList.add("row-hover");
+  table.querySelectorAll(`tr > *:nth-child(${cell.cellIndex + 1})`).forEach((columnCell) => {
+    columnCell.classList.add("column-hover");
+  });
+}
+
+function handlePlayersTablePointerOver(event) {
+  const cell = event.target.closest(".players-table th, .players-table td");
+
+  if (!cell || !characterGrid.contains(cell)) {
+    return;
+  }
+
+  applyPlayersTableHover(cell);
+}
+
+function handlePlayersTablePointerOut(event) {
+  const table = event.target.closest?.(".players-table");
+
+  if (table && !table.contains(event.relatedTarget)) {
+    clearPlayersTableHover(table);
+  }
+}
+
+characterGrid.addEventListener("pointerover", handlePlayersTablePointerOver);
+characterGrid.addEventListener("pointerout", handlePlayersTablePointerOut);
+
 characterGrid.addEventListener("click", (event) => {
   const button = event.target.closest("button");
 
@@ -2664,6 +2900,7 @@ helpModal?.addEventListener("click", (event) => {
 settingsPanelButton?.addEventListener("click", () => openSetupModal("gameSettingsModal"));
 roomPanelButton?.addEventListener("click", () => openSetupModal("roomSetupModal"));
 rolePanelButton?.addEventListener("click", () => openSetupModal("roleSetupModal"));
+votingButton?.addEventListener("click", () => openVotingModal(true));
 setupModals.forEach((modal) => {
   modal.addEventListener("click", (event) => {
     if (event.target === modal || event.target.closest("[data-close-setup]")) {
@@ -2688,9 +2925,35 @@ confirmModal.addEventListener("click", (event) => {
   }
 });
 
+votingCloseButton?.addEventListener("click", closeVotingModal);
+votingResetButton?.addEventListener("click", () => openVotingModal(true));
+votingFinishButton?.addEventListener("click", finishVoting);
+votingList?.addEventListener("change", (event) => {
+  const select = event.target.closest("select[data-vote-player]");
+
+  if (!select) {
+    return;
+  }
+
+  const voterNumber = Number(select.dataset.votePlayer);
+  const targetNumber = Number(select.value);
+
+  if (targetNumber) {
+    votingVotes[voterNumber] = targetNumber;
+  } else {
+    delete votingVotes[voterNumber];
+  }
+});
+votingModal?.addEventListener("click", (event) => {
+  if (event.target === votingModal) {
+    closeVotingModal();
+  }
+});
+
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closeAllSetupModals();
+    closeVotingModal();
     closeHelpPanel();
   }
 });

@@ -126,7 +126,7 @@ io.on("connection", (socket) => {
     }
 
     setTraitRevealed(room, Number(playerNumber), traitKey);
-    room.gameLog.push(`Открыта характеристика Игрока ${Number(playerNumber)}`);
+    room.gameLog.push(`Открыта характеристика Игрока ${Number(playerNumber)}: ${getTraitAccusative(traitKey)}`);
     broadcastRoom(room.roomCode);
   });
 
@@ -310,6 +310,25 @@ function setTraitRevealed(room, playerNumber, traitKey) {
   }
 
   room.revealedTraits[playerNumber][traitKey] = true;
+}
+
+function getTraitAccusative(traitKey) {
+  const labels = {
+    gender: "пол",
+    bodyType: "тип тела",
+    trait: "черту",
+    age: "возраст",
+    profession: "профессию",
+    health: "здоровье",
+    hobby: "хобби",
+    phobia: "фобию",
+    largeInventory: "крупный инвентарь",
+    backpack: "рюкзак",
+    additionalInfo: "информацию",
+    specialAbility: "способность"
+  };
+
+  return labels[traitKey] || "характеристику";
 }
 
 function assignPlayerNumber(room) {

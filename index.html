@@ -27,6 +27,10 @@
           <span aria-hidden="true">👤</span>
           <span>Роль</span>
         </button>
+        <button class="top-action-button" id="votingButton" type="button" aria-haspopup="dialog">
+          <span aria-hidden="true">✓</span>
+          <span>Голосование</span>
+        </button>
         <button class="top-action-button" id="helpButton" type="button" aria-label="Помощь" aria-haspopup="dialog" aria-expanded="false">
           <span aria-hidden="true">?</span>
           <span>Помощь</span>
@@ -213,6 +217,20 @@
       <div class="modal-actions">
         <button class="main-button" id="confirmYesButton" type="button">Да</button>
         <button class="ghost-button" id="confirmNoButton" type="button">Нет</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="votingModal" hidden>
+    <div class="confirm-modal voting-modal" role="dialog" aria-modal="true" aria-labelledby="votingTitle">
+      <button class="modal-close-button" id="votingCloseButton" type="button" aria-label="Закрыть">×</button>
+      <span class="eyebrow">Отбор</span>
+      <h3 id="votingTitle">Голосование</h3>
+      <div class="voting-list" id="votingList"></div>
+      <div class="voting-results" id="votingResults" aria-live="polite" hidden></div>
+      <div class="modal-actions">
+        <button class="main-button" id="votingFinishButton" type="button">Завершить</button>
+        <button class="ghost-button" id="votingResetButton" type="button">Новое</button>
       </div>
     </div>
   </div>
