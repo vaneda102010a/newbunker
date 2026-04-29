@@ -426,8 +426,8 @@ button:focus-visible {
 .content-container {
   display: grid;
   gap: 18px;
-  width: 98%;
-  max-width: 2000px;
+  width: 100%;
+  max-width: 1400px;
   margin: 0 auto;
   min-width: 0;
 }

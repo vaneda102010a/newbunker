@@ -1213,13 +1213,11 @@ function renderPlayersTable(characters) {
     <div class="table-wrapper">
       <table class="players-table">
         <colgroup>
-          <col class="players-table-number-col">
           <col class="players-table-player-col">
           ${tableTraits.map((trait) => `<col class="players-table-data-col players-table-${trait.key}-col">`).join("")}
         </colgroup>
         <thead>
           <tr>
-            <th scope="col">#</th>
             <th scope="col">Игрок</th>
             ${tableTraits.map((trait) => `<th scope="col">${getTableTraitLabel(trait)}</th>`).join("")}
           </tr>
@@ -1241,10 +1239,9 @@ function renderPlayerTableRow(character, gameIsOver) {
 
   return `
     <tr class="${isExcluded ? "excluded" : ""}${isOwn ? " own-row" : ""}" style="--accent: ${character.accent}" data-player="${character.number}">
-      <th class="players-table-number" scope="row">${character.number}</th>
       <td class="players-table-player" title="${escapeHtml(playerTitle)}">${renderPlayerTableSlot(character, isExcluded, gameIsOver)}</td>
       ${tableTraits.map((trait, columnIndex) => `
-        <td class="players-table-cell trait-${trait.key}${isNewlyRevealedTrait(character.number, trait.key) ? " revealed-now-cell" : ""}" data-column="${columnIndex + 2}" title="${escapeHtml(getTableTraitTitle(character, trait))}">
+        <td class="players-table-cell trait-${trait.key}${isNewlyRevealedTrait(character.number, trait.key) ? " revealed-now-cell" : ""}" data-column="${columnIndex + 1}" title="${escapeHtml(getTableTraitTitle(character, trait))}">
           ${renderTraitValue(character, trait, { view: VIEW_TABLE })}
         </td>
       `).join("")}
