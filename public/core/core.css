@@ -591,7 +591,7 @@ button:focus-visible {
   gap: 12px;
   align-items: start;
   width: 100%;
-  padding: 18px 20px;
+  padding: 0 20px 18px 20px; /* no top padding so text starts immediately */
   border-radius: 16px;
 }
 
@@ -601,73 +601,98 @@ button:focus-visible {
   line-height: 1.25;
 }
 
+/* Log messages area */
 .game-log-list {
-  display: grid;
-  gap: 7px;
-  max-height: 132px;
+  display: block;
+  gap: 6px;
+  max-height: 320px;
   margin: 0;
-  padding: 0;
-  overflow: auto;
+  padding: 8px;
+  overflow-y: auto;
   color: rgba(245, 245, 247, 0.84);
   font-size: 13px;
   line-height: 1.4;
-
-  /* Контейнер для двух способностей */
-  .special-abilities-container {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    height: 100%;
-  }
-
-  .ability-slot {
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid #444;
-    transition: all 0.4s ease-in-out;
-    overflow: hidden;
-    cursor: pointer;
-    min-height: 30px; /* Высота в закрытом виде */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 5px;
-  }
-
-  .ability-slot.closed::before {
-    content: "🔒 Способность №" attr(data-slot);
-    color: #888;
-    font-size: 0.8em;
-  }
-
-  .ability-slot.closed .ability-text {
-    display: none;
-  }
-
-  .ability-slot.opened {
-    background: rgba(0, 255, 0, 0.1);
-    min-height: 80px; /* Раскрывается при использовании */
-    border-color: #00ff00;
-  }
-
-  .ability-slot.opened::before {
-    content: "✅ Использовано";
-    display: block;
-    font-size: 0.7em;
-    color: #00ff00;
-    margin-bottom: 5px;
-  }
   list-style: none;
+  background: transparent;
+}
+
+/* Thin scrollbar for log area */
+.game-log-list::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.game-log-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.game-log-list::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.08);
+  border-radius: 8px;
+}
+
+.game-log-list {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.08) transparent;
 }
 
 .game-log-list li {
-  padding: 8px 10px;
-  border: 1px solid var(--border-soft);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
+  padding: 4px 8px;
+  margin: 0 0 4px 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  word-wrap: break-word;
 }
 
 .game-log-list .log-empty {
   color: var(--muted-2);
+}
+
+/* Extracted ability slot styles (was nested incorrectly) */
+.special-abilities-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  height: 100%;
+}
+
+.ability-slot {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid #444;
+  transition: all 0.4s ease-in-out;
+  overflow: hidden;
+  cursor: pointer;
+  min-height: 30px; /* Высота в закрытом виде */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
+}
+
+.ability-slot.closed::before {
+  content: "🔒 Способность №" attr(data-slot);
+  color: #888;
+  font-size: 0.8em;
+}
+
+.ability-slot.closed .ability-text {
+  display: none;
+}
+
+.ability-slot.opened {
+  background: rgba(0, 255, 0, 0.1);
+  min-height: 80px; /* Раскрывается при использовании */
+  border-color: #00ff00;
+}
+
+.ability-slot.opened::before {
+  content: "✅ Использовано";
+  display: block;
+  font-size: 0.7em;
+  color: #00ff00;
+  margin-bottom: 5px;
 }
 
 .characters-section {
