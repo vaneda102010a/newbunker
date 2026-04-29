@@ -41,7 +41,8 @@ const tableTraits = [
   { key: "largeInventory", label: "Крупное" },
   { key: "backpack", label: "Рюкзак" },
   { key: "additionalInfo", label: "Инфо" },
-  { key: "specialAbility", label: "Способность" }
+  { key: "specialAbility", label: "Спец. воз." },
+  { key: "specialAbility2", label: "Спец. воз. 2" }
 ];
 
 const traitIcons = {
@@ -933,7 +934,9 @@ function createLocalPlayer(index, abilityCards, drawState) {
     largeInventory: drawCard(cardSections.largeInventory, drawState),
     backpack: drawCard(cardSections.backpack, drawState),
     additionalInfo: drawCard(cardSections.additionalInfo, drawState),
-    specialAbility: abilityCards.join("; "),
+    // split abilities into two separate fields for table columns
+    specialAbility: abilityCards[0] || "",
+    specialAbility2: abilityCards[1] || "",
     accent: cardColors[index % cardColors.length]
   };
 }
@@ -1260,7 +1263,13 @@ function getTableTraitTitle(character, trait) {
   }
 
   if (trait.key === "specialAbility") {
-    return getPlayerAbilities(character).join("; ") || "Не указано";
+    const abilities = getPlayerAbilities(character);
+    return abilities[0] || "Не указано";
+  }
+
+  if (trait.key === "specialAbility2") {
+    const abilities = getPlayerAbilities(character);
+    return abilities[1] || "Не указано";
   }
 
   if (shouldShowFantasyRaceWithGender(character, trait)) {
@@ -1385,6 +1394,9 @@ function renderVisibleTraitValue(character, trait, isPublic, options = {}) {
     value = renderHealthValue(character, tone);
   } else if (trait.key === "specialAbility") {
     value = renderTraitSignal(renderSpecialAbilities(character), tone);
+  } else if (trait.key === "specialAbility2") {
+    const second = cleanText(character?.specialAbility2, "");
+    value = renderTraitSignal(second ? renderAbilityCard(character.number, second, 1) : `<span class="trait-value">Не указано</span>`, tone);
   } else if (options.view === VIEW_TABLE && shouldShowFantasyRaceWithGender(character, trait)) {
     value = renderTraitSignal(renderFantasyRaceGenderValue(character), tone);
   } else {
@@ -1752,10 +1764,12 @@ function renderHealthFixAction(playerNumber) {
 }
 
 function getPlayerAbilities(player) {
-  return cleanText(player?.specialAbility, "")
-    .split(";")
-    .map((ability) => ability.trim())
-    .filter(Boolean);
+  const first = cleanText(player?.specialAbility, "").trim();
+  const second = cleanText(player?.specialAbility2, "").trim();
+  const list = [];
+  if (first) list.push(first);
+  if (second) list.push(second);
+  return list;
 }
 
 function getAbilityKey(playerNumber, abilityIndex) {
@@ -2010,16 +2024,46 @@ function rerollTrait(playerNumber, traitKey) {
   if (!player || !cardSections[traitKey]) {
     return;
   }
-
-  player[traitKey] = drawReplacementTrait(traitKey, player[traitKey]);
-  refreshDerivedTraitData(player, traitKey);
+  // Special handling for special abilities (two separate slots)
   if (traitKey === "specialAbility") {
+    const abilities = [];
+    const drawState = createDrawState();
+
+    while (abilities.length < 2) {
+      const ability = drawCard(cardSections.specialAbility, drawState, new Set(abilities));
+
+      if (ability === "Не указано") {
+        break;
+      }
+
+      abilities.push(ability);
+    }
+
+    player.specialAbility = abilities[0] || player.specialAbility || "";
+    player.specialAbility2 = abilities[1] || "";
+
+    // clear used flags for this player
     Object.keys(usedAbilities)
       .filter((abilityKey) => abilityKey.startsWith(`${player.number}:`))
       .forEach((abilityKey) => {
         delete usedAbilities[abilityKey];
       });
+
+    addGameLog(`Ведущий перегенерировал способности Игроку ${player.number}`);
+    renderPack(currentPack);
+    renderGameLog();
+
+    if (isOnlineRoom()) {
+      syncHostState();
+    }
+
+    setStatus(`Игрок ${player.number}: способности перегенерированы.`, "success");
+    return;
   }
+
+  // Default handling for other traits
+  player[traitKey] = drawReplacementTrait(traitKey, player[traitKey]);
+  refreshDerivedTraitData(player, traitKey);
   addGameLog(`Ведущий перегенерировал ${getTraitAccusative(traitKey)} Игроку ${player.number}`);
   renderPack(currentPack);
   renderGameLog();
@@ -2411,6 +2455,31 @@ function applyRerollAbility(context) {
 
   if (!target || !traitKey || !cardSections[traitKey]) {
     addGameLog(`Перегенерация Игрока ${context.actorNumber} требует ручного применения`);
+    return;
+  }
+
+  if (traitKey === "specialAbility") {
+    const abilities = [];
+    const drawState = createDrawState();
+
+    while (abilities.length < 2) {
+      const ability = drawCard(cardSections.specialAbility, drawState, new Set(abilities));
+      if (ability === "Не указано") break;
+      abilities.push(ability);
+    }
+
+    target.specialAbility = abilities[0] || target.specialAbility || "";
+    target.specialAbility2 = abilities[1] || "";
+    // clear used flags for this player's abilities
+    Object.keys(usedAbilities)
+      .filter((abilityKey) => abilityKey.startsWith(`${target.number}:`))
+      .forEach((abilityKey) => delete usedAbilities[abilityKey]);
+
+    addGameLog(`Игрок ${context.actorNumber} перегенерировал способности Игроку ${target.number}`);
+    refreshDerivedTraitData(target, traitKey);
+    renderPack(currentPack);
+    renderGameLog();
+    if (isOnlineRoom()) syncHostState();
     return;
   }
 

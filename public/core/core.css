@@ -881,6 +881,13 @@ th, td {
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+/* Allow manual horizontal resize of table columns in supporting browsers */
+th {
+  resize: horizontal;
+  overflow: auto;
+  min-width: 100px;
+}
+
 td {
   white-space: normal;
   line-height: 1.4;
