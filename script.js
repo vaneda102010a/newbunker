@@ -1518,10 +1518,29 @@ function renderSpecialAbilities(character) {
     return `<span class="trait-value">Не указано</span>`;
   }
 
+  // Ensure we always render two slots (top and bottom).
+  const slot0 = abilities[0] || "";
+  const slot1 = abilities[1] || "";
+
+  const used0 = Boolean(usedAbilities[`${character.number}:0`]);
+  const used1 = Boolean(usedAbilities[`${character.number}:1`]);
+
+  const slot0Class = used0 ? "ability-slot opened" : "ability-slot closed";
+  const slot1Class = used1 ? "ability-slot opened" : "ability-slot closed";
+
   return `
-    <span class="ability-buttons">
-      ${abilities.map((ability, index) => renderAbilityCard(character.number, ability, index)).join("")}
-    </span>
+    <div class="special-abilities-container">
+      <div class="ability-slot-top ${slot0Class}" data-slot="1" data-player="${character.number}" data-ability-index="0">
+        <div class="ability-text">
+          ${slot0 ? renderAbilityCard(character.number, slot0, 0) : ""}
+        </div>
+      </div>
+      <div class="ability-slot-bottom ${slot1Class}" data-slot="2" data-player="${character.number}" data-ability-index="1">
+        <div class="ability-text">
+          ${slot1 ? renderAbilityCard(character.number, slot1, 1) : ""}
+        </div>
+      </div>
+    </div>
   `;
 }
 

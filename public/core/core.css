@@ -611,6 +611,51 @@ button:focus-visible {
   color: rgba(245, 245, 247, 0.84);
   font-size: 13px;
   line-height: 1.4;
+
+  /* Контейнер для двух способностей */
+  .special-abilities-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    height: 100%;
+  }
+
+  .ability-slot {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid #444;
+    transition: all 0.4s ease-in-out;
+    overflow: hidden;
+    cursor: pointer;
+    min-height: 30px; /* Высота в закрытом виде */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px;
+  }
+
+  .ability-slot.closed::before {
+    content: "🔒 Способность №" attr(data-slot);
+    color: #888;
+    font-size: 0.8em;
+  }
+
+  .ability-slot.closed .ability-text {
+    display: none;
+  }
+
+  .ability-slot.opened {
+    background: rgba(0, 255, 0, 0.1);
+    min-height: 80px; /* Раскрывается при использовании */
+    border-color: #00ff00;
+  }
+
+  .ability-slot.opened::before {
+    content: "✅ Использовано";
+    display: block;
+    font-size: 0.7em;
+    color: #00ff00;
+    margin-bottom: 5px;
+  }
   list-style: none;
 }
 
