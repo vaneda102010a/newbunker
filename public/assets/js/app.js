@@ -11,8 +11,8 @@ const themes = [
   { id: "fantasy", name: "Фэнтези" }
 ];
 const themeCardSources = {
-  classic: { path: "/cards.txt", fileName: "cards.txt", allowFallback: true },
-  fantasy: { path: "/cards-fantasy.txt", fileName: "cards Fantasy.txt", allowFallback: false }
+  classic: { path: "/api/cards/classic", fileName: "classic/cards.txt", allowFallback: true },
+  fantasy: { path: "/api/cards/fantasy", fileName: "fantasy/cards.txt", allowFallback: false }
 };
 const characterTraits = [
   { key: "gender", label: "Пол" },

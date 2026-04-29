@@ -10,6 +10,9 @@ const io = new Server(server);
 const PORT = process.env.PORT || 3000;
 const PUBLIC_URL = process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || "https://bunker-s4n4.onrender.com";
 const PROJECT_ROOT = __dirname;
+const PUBLIC_DIR = path.join(PROJECT_ROOT, "public");
+const THEME_DIR = path.join(PUBLIC_DIR, "themes");
+const DEFAULT_THEME_ID = "classic";
 const STATIC_FILES = {
   "/script.js": "script.js",
   "/style.css": "style.css",
@@ -29,24 +32,27 @@ Object.entries(STATIC_FILES).forEach(([route, fileName]) => {
   });
 });
 
-app.get("/cards.txt", (req, res) => {
-  res.setHeader("Cache-Control", "no-store");
-  res.setHeader("Content-Type", "text/plain; charset=utf-8");
-  res.sendFile(path.join(PROJECT_ROOT, "cards.txt"));
-});
+app.use("/core", express.static(path.join(PUBLIC_DIR, "core")));
+app.use("/themes", express.static(THEME_DIR));
 
-app.get("/cards-fantasy.txt", (req, res) => {
-  const fileName = "cards Fantasy.txt";
-  const filePath = path.join(PROJECT_ROOT, fileName);
+function getSafeThemeId(theme) {
+  const themeId = String(theme || "").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+  const requestedPath = path.join(THEME_DIR, themeId, "cards.txt");
 
-  res.setHeader("Cache-Control", "no-store");
-  res.setHeader("Content-Type", "text/plain; charset=utf-8");
-
-  if (!fs.existsSync(filePath)) {
-    res.status(404).send(`${fileName} not found`);
-    return;
+  if (themeId && fs.existsSync(requestedPath)) {
+    return themeId;
   }
 
+  return DEFAULT_THEME_ID;
+}
+
+app.get("/api/cards/:theme", (req, res) => {
+  const themeId = getSafeThemeId(req.params.theme);
+  const filePath = path.join(THEME_DIR, themeId, "cards.txt");
+
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.setHeader("X-Theme-Id", themeId);
   res.sendFile(filePath);
 });
 
@@ -444,5 +450,5 @@ function sendReply(reply, payload) {
 server.listen(PORT, () => {
   console.log(`Bunker generator is running on port ${PORT}`);
   console.log(`Public URL: ${PUBLIC_URL}`);
-  console.log(`Cards file: ${PUBLIC_URL}/cards.txt`);
+  console.log(`Cards API: ${PUBLIC_URL}/api/cards/${DEFAULT_THEME_ID}`);
 });

@@ -11,8 +11,8 @@ const themes = [
   { id: "fantasy", name: "Фэнтези" }
 ];
 const themeCardSources = {
-  classic: { path: "/cards.txt", fileName: "cards.txt", allowFallback: true },
-  fantasy: { path: "/cards-fantasy.txt", fileName: "cards Fantasy.txt", allowFallback: false }
+  classic: { path: "/api/cards/classic", fileName: "classic/cards.txt", allowFallback: true },
+  fantasy: { path: "/api/cards/fantasy", fileName: "fantasy/cards.txt", allowFallback: false }
 };
 const characterTraits = [
   { key: "gender", label: "Пол" },
@@ -200,6 +200,24 @@ let votingIsActive = false;
 let votingResult = null;
 const handledAbilityRequests = new Set();
 const cardDatabaseCache = new Map();
+const fallbackThemeEngine = {
+  id: DEFAULT_THEME_ID,
+  name: "Classic",
+  isFallback: true,
+  getAge: (context = {}) => context.fallback ?? null,
+  getGender: (context = {}) => context.fallback ?? null,
+  calculateSurvival: () => null,
+  getThemeStyles: () => "",
+  loadCards: async () => null,
+  loadData: async () => null
+};
+let currentTheme = fallbackThemeEngine;
+let themeIsLoading = false;
+let themeEngineWaitPromise = null;
+let themeLoadSequence = 0;
+
+window.currentTheme = window.currentTheme || currentTheme;
+console.log(`[theme] script fallback currentTheme set: ${currentTheme.id}`);
 
 function getSavedCharacterView() {
   try {
@@ -248,8 +266,106 @@ function setActiveTheme(themeId) {
 }
 
 function applySelectedTheme() {
-  setActiveTheme(getSelectedTheme().id);
+  const selectedThemeId = getSelectedTheme().id;
+  setActiveTheme(selectedThemeId);
+  loadThemeEngine(selectedThemeId);
 }
+
+// Step 2 bridge: the ES module engine owns plugin imports, while script.js keeps the old game flow.
+function setCurrentThemeEngine(theme) {
+  currentTheme = theme || fallbackThemeEngine;
+  window.currentTheme = currentTheme;
+  console.log(`[theme] script currentTheme set: ${currentTheme.id}`);
+  return currentTheme;
+}
+
+function setThemeLoading(isLoading) {
+  themeIsLoading = Boolean(isLoading);
+  updateControlAvailability();
+}
+
+function waitForThemeEngineApi() {
+  if (typeof window.HopeThemeEngine?.loadTheme === "function") {
+    return Promise.resolve(window.HopeThemeEngine);
+  }
+
+  if (themeEngineWaitPromise) {
+    return themeEngineWaitPromise;
+  }
+
+  themeEngineWaitPromise = new Promise((resolve) => {
+    let resolved = false;
+    const finish = () => {
+      if (resolved) {
+        return;
+      }
+
+      resolved = true;
+      window.removeEventListener("hope:theme-engine-ready", finish);
+      resolve(window.HopeThemeEngine || null);
+    };
+
+    window.addEventListener("hope:theme-engine-ready", finish, { once: true });
+    window.setTimeout(finish, 2000);
+  });
+
+  return themeEngineWaitPromise;
+}
+
+async function loadThemeEngine(themeId = DEFAULT_THEME_ID) {
+  const requestedThemeId = getThemeById(themeId).id;
+  const sequence = ++themeLoadSequence;
+  setThemeLoading(true);
+
+  try {
+    const api = await waitForThemeEngineApi();
+
+    if (typeof api?.loadTheme !== "function") {
+      console.warn("[theme] ES module engine is not ready; using classic fallback.");
+      return setCurrentThemeEngine(fallbackThemeEngine);
+    }
+
+    const theme = await api.loadTheme(requestedThemeId);
+    return setCurrentThemeEngine(theme || fallbackThemeEngine);
+  } catch (error) {
+    console.error("[theme] Theme engine failed to load; using classic fallback.", error);
+    return setCurrentThemeEngine(fallbackThemeEngine);
+  } finally {
+    if (sequence === themeLoadSequence) {
+      setThemeLoading(false);
+    }
+  }
+}
+
+function getCurrentThemeEngine() {
+  return currentTheme || window.HopeThemeEngine?.currentTheme || window.currentTheme || fallbackThemeEngine;
+}
+
+function getThemeAgeByRace(race, fallback = null) {
+  const theme = getCurrentThemeEngine();
+
+  if (typeof theme?.getAge === "function") {
+    const age = theme.getAge({ race, fallback });
+    return age ?? fallback;
+  }
+
+  return fallback;
+}
+
+function getThemeGenderByRace(race, fallback = null) {
+  const theme = getCurrentThemeEngine();
+
+  if (typeof theme?.getGender === "function") {
+    const gender = theme.getGender({ race, fallback });
+    return gender ?? fallback;
+  }
+
+  return fallback;
+}
+
+window.addEventListener("hope:theme-loaded", (event) => {
+  setCurrentThemeEngine(event.detail?.theme || fallbackThemeEngine);
+});
 
 function getSettings() {
   const selectedTheme = getSelectedTheme();
@@ -349,7 +465,7 @@ function updatePlayerNumberOptions() {
 }
 
 function updateControlAvailability() {
-  const hostCanGenerate = cardsAreReady && isHostView();
+  const hostCanGenerate = cardsAreReady && !themeIsLoading && isHostView();
   generateButton.disabled = !hostCanGenerate;
   randomThemeButton.disabled = !hostCanGenerate;
   playerCountSelect.disabled = !isHostView();
@@ -729,6 +845,7 @@ async function generateLocalPack() {
   const source = getThemeCardSource(settings.theme);
 
   setGenerationReady(false);
+  await loadThemeEngine(settings.theme);
 
   try {
     cardDatabase = await loadCardsForTheme(settings.theme);
@@ -771,8 +888,7 @@ function createLocalPack(settings) {
   // Для темы Фэнтези: если в разделе "Пол" хранятся расы — генерируем итоговый пол на основании расы
   if (themeId === "fantasy") {
     players.forEach((p) => {
-      const race = cleanText(p.gender, "");
-      p.gender = getGenderByRace(race);
+      p.gender = getThemeGenderByRace(cleanText(p.race || p.gender, ""), p.gender);
     });
   }
 
@@ -799,7 +915,7 @@ function createRandomizedBunker(template, availableSlots) {
 function createLocalPlayer(index, abilityCards, drawState) {
   const health = drawCard(cardSections.health, drawState);
   const race = drawCard("Раса", drawState);
-  const age = getAgeByRace(race);
+  const age = getThemeAgeByRace(race, randomInt(18, 60));
 
   return {
     number: index + 1,
@@ -2298,47 +2414,6 @@ function refreshDerivedTraitData(player, traitKey) {
   player.healthExplanation = getHealthExplanation(player.health);
 }
 
-// ===== ГЕНЕРАЦИЯ ПОЛА С УЧЁТОМ РАСЫ =====
-
-function getGenderByRace(race) {
-  const rand = Math.random() * 100;
-  const r = String(race || "").trim();
-
-  // 100% женские
-  if (["Фея", "Гарпия"].includes(r)) {
-    return "Женщина";
-  }
-
-  // Дроу
-  if (r === "Тёмный эльф (дроу)") {
-    if (rand < 91) return "Женщина";
-    return "Мужчина";
-  }
-
-  // Все эльфы (кроме дроу)
-  if ([
-    "Эльф",
-    "Лесной эльф",
-    "Высший эльф"
-  ].includes(r)) {
-    if (rand < 80) return "Женщина";
-    if (rand < 98) return "Мужчина";
-    return "Бесполый";
-  }
-
-  // Нимфа
-  if (r === "Нимфа") {
-    if (rand < 80) return "Женщина";
-    if (rand < 90) return "Мужчина";
-    return "Бесполый";
-  }
-
-  // ОБЩИЙ СЛУЧАЙ
-  if (rand < 50) return "Женщина";
-  if (rand < 92) return "Мужчина";
-  return "Бесполый";
-}
-
 const SURVIVAL_RULE_GROUPS = {
   resources: [
     { points: 50, label: "Есть консервы или пайки", keywords: ["консервы", "консерв", "пайки"] },
@@ -2395,44 +2470,6 @@ const SURVIVAL_RULE_GROUPS = {
     }
   ]
 };
-
-// Возвращает случайное целое между min и max включительно
-function getRandomInt(min, max) {
-  const lo = Math.ceil(Number(min) || 0);
-  const hi = Math.floor(Number(max) || 0);
-  if (hi <= lo) return lo;
-  return Math.floor(Math.random() * (hi - lo + 1)) + lo;
-}
-
-// ===== ГЕНЕРАЦИЯ ВОЗРАСТА ПО РАСЕ =====
-function getAgeByRace(race) {
-  const r = String(race || "").trim();
-  const ranges = {
-    "Высший эльф": [100, 700],
-    "Эльф": [100, 600],
-    "Лесной эльф": [80, 550],
-    "Тёмный эльф (дроу)": [80, 500],
-    "Гном": [40, 450],
-    "Дворф": [40, 350],
-    "Орк": [15, 140],
-    "Нимфа": [20, 400],
-    "Сатир": [20, 400],
-    "Аасимар": [18, 120],
-    "Кобольд": [10, 90],
-    "Тролль": [15, 90],
-    "Тифлинг": [16, 80],
-    "Драконорожденный": [15, 75],
-    "Ламия": [15, 70],
-    "Гарпия": [15, 70],
-    "Гоблин": [8, 50],
-    "Фея": [10, 100],
-    "Младший Демон": [10, 1000],
-    "Суккуб/Инкуб": [100, 10000]
-  };
-
-  const pair = ranges[r] || [18, 60];
-  return getRandomInt(pair[0], pair[1]);
-}
 
 function getTraitInstrumental(traitKey) {
   const labels = {
