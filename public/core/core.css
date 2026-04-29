@@ -695,10 +695,12 @@ button:focus-visible {
 
 .players-table-wrap,
 .table-container {
-  width: 96%;
-  max-width: 1800px;
+  width: 100%;
+  max-width: none;
   min-width: 0;
-  margin: 0 auto;
+  margin: 0;
+  padding: 20px;
+  box-sizing: border-box;
   overflow-x: auto;
   overflow-y: visible;
   border: 1px solid var(--border);
@@ -832,6 +834,49 @@ button:focus-visible {
     opacity: 1;
   }
 }
+
+/* Table layout and readability improvements */
+.table-wrapper {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+  min-width: 600px;
+}
+
+/* Укрупняем текст и делаем строки более читабельными */
+th, td {
+  font-size: 1.15rem; /* ~18px */
+  padding: 15px 10px;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+td {
+  white-space: normal;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+/* Zebra rows and hover */
+table tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+table tbody tr:hover {
+  background: rgba(138, 43, 226, 0.2);
+}
+
+/* Header emphasis */
+th {
+  font-size: 1.2rem;
+  border-bottom: 3px solid rgba(120, 80, 255, 0.9);
+}
+
 
 @keyframes setupModalIn {
   from {

@@ -1210,23 +1210,25 @@ function renderPlayersTable(characters) {
   const table = document.createElement("div");
   table.className = "players-table-wrap table-container";
   table.innerHTML = `
-    <table class="players-table">
-      <colgroup>
-        <col class="players-table-number-col">
-        <col class="players-table-player-col">
-        ${tableTraits.map((trait) => `<col class="players-table-data-col players-table-${trait.key}-col">`).join("")}
-      </colgroup>
-      <thead>
-        <tr>
-          <th scope="col">#</th>
-          <th scope="col">Игрок</th>
-          ${tableTraits.map((trait) => `<th scope="col">${getTableTraitLabel(trait)}</th>`).join("")}
-        </tr>
-      </thead>
-      <tbody>
-        ${characters.map((character) => renderPlayerTableRow(character, gameIsOver)).join("")}
-      </tbody>
-    </table>
+    <div class="table-wrapper">
+      <table class="players-table">
+        <colgroup>
+          <col class="players-table-number-col">
+          <col class="players-table-player-col">
+          ${tableTraits.map((trait) => `<col class="players-table-data-col players-table-${trait.key}-col">`).join("")}
+        </colgroup>
+        <thead>
+          <tr>
+            <th scope="col">#</th>
+            <th scope="col">Игрок</th>
+            ${tableTraits.map((trait) => `<th scope="col">${getTableTraitLabel(trait)}</th>`).join("")}
+          </tr>
+        </thead>
+        <tbody>
+          ${characters.map((character) => renderPlayerTableRow(character, gameIsOver)).join("")}
+        </tbody>
+      </table>
+    </div>
   `;
 
   characterGrid.append(table);

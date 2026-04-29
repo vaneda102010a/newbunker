@@ -94,6 +94,29 @@ body.theme-fantasy::before {
   color: #e8ecff;
 }
 
+/* Fantasy theme: increase table readability */
+.theme-fantasy .players-table {
+  font-size: 1.05rem;
+}
+
+.theme-fantasy .players-table th,
+.theme-fantasy .players-table td {
+  padding: 14px 12px;
+}
+
+.theme-fantasy .players-table thead th {
+  font-size: 1.2rem;
+  border-bottom: 3px solid rgba(180, 112, 255, 0.95);
+}
+
+.theme-fantasy .players-table tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.theme-fantasy .players-table tbody tr:hover {
+  background: linear-gradient(90deg, rgba(160, 100, 255, 0.18), transparent 54%), rgba(22, 24, 58, 0.78);
+}
+
 .theme-fantasy td,
 .theme-fantasy .players-table th,
 .theme-fantasy .players-table td {
