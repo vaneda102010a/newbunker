@@ -114,6 +114,52 @@ export function whenThemeReady() {
   return currentLoadPromise.catch(() => fallbackTheme);
 }
 
+// Utility: generate age for a given race using the active theme's age logic.
+export function generateAgeForRace(race) {
+  const theme = getCurrentTheme();
+
+  // Helper: integer random inclusive
+  function randInt(min, max) {
+    const lo = Math.ceil(Number(min) || 0);
+    const hi = Math.floor(Number(max) || 0);
+    if (hi <= lo) return lo;
+    return Math.floor(Math.random() * (hi - lo + 1)) + lo;
+  }
+
+  function getRussianYearWord(age) {
+    const lastTwo = age % 100;
+    const last = age % 10;
+    if (lastTwo >= 11 && lastTwo <= 14) return "лет";
+    if (last === 1) return "год";
+    if (last >= 2 && last <= 4) return "года";
+    return "лет";
+  }
+
+  let numeric = null;
+
+  try {
+    if (theme && typeof theme.getAge === "function") {
+      numeric = theme.getAge({ race, fallback: null });
+    }
+  } catch (e) {
+    numeric = null;
+  }
+
+  if (numeric == null) {
+    numeric = randInt(18, 60);
+  }
+
+  // If theme returned a range-like array, handle it
+  if (Array.isArray(numeric) && numeric.length >= 2) {
+    numeric = randInt(Number(numeric[0]) || 18, Number(numeric[1]) || 60);
+  }
+
+  // Ensure integer
+  numeric = Number(numeric) || randInt(18, 60);
+
+  return `${numeric} ${getRussianYearWord(numeric)}`;
+}
+
 export function attachThemeSelect(select = document.querySelector("#themeSelect")) {
   if (!select || select.dataset.themeEngineAttached === "true") {
     return;
