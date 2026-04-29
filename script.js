@@ -1220,7 +1220,7 @@ function renderPlayersTable(characters) {
         <tr>
           <th scope="col">#</th>
           <th scope="col">Игрок</th>
-          ${tableTraits.map((trait) => `<th scope="col">${trait.label}</th>`).join("")}
+          ${tableTraits.map((trait) => `<th scope="col">${getTableTraitLabel(trait)}</th>`).join("")}
         </tr>
       </thead>
       <tbody>
@@ -1243,7 +1243,7 @@ function renderPlayerTableRow(character, gameIsOver) {
       <td class="players-table-player" title="${escapeHtml(playerTitle)}">${renderPlayerTableSlot(character, isExcluded, gameIsOver)}</td>
       ${tableTraits.map((trait, columnIndex) => `
         <td class="players-table-cell trait-${trait.key}${isNewlyRevealedTrait(character.number, trait.key) ? " revealed-now-cell" : ""}" data-column="${columnIndex + 2}" title="${escapeHtml(getTableTraitTitle(character, trait))}">
-          ${renderTraitValue(character, trait)}
+          ${renderTraitValue(character, trait, { view: VIEW_TABLE })}
         </td>
       `).join("")}
     </tr>
@@ -1264,7 +1264,19 @@ function getTableTraitTitle(character, trait) {
     return getPlayerAbilities(character).join("; ") || "Не указано";
   }
 
+  if (shouldShowFantasyRaceWithGender(character, trait)) {
+    return getFantasyRaceGenderLines(character).join(" / ");
+  }
+
   return cleanText(character[trait.key], "");
+}
+
+function getTableTraitLabel(trait) {
+  if (trait.key === "gender" && isFantasyPackActive()) {
+    return "Пол / Раса";
+  }
+
+  return trait.label;
 }
 
 function renderPlayerTableSlot(character, isExcluded, gameIsOver) {
@@ -1319,14 +1331,14 @@ function renderTraitRow(character, trait) {
   `;
 }
 
-function renderTraitValue(character, trait) {
+function renderTraitValue(character, trait, options = {}) {
   const isPublic = isTraitRevealed(character.number, trait.key);
 
   if (!canViewTrait(character.number, trait.key)) {
     return renderHiddenTraitValue(character.number, trait);
   }
 
-  return renderVisibleTraitValue(character, trait, isPublic);
+  return renderVisibleTraitValue(character, trait, isPublic, options);
 }
 
 function canViewTrait(playerNumber, traitKey) {
@@ -1363,7 +1375,7 @@ function renderHostHiddenTraitControls(playerNumber, trait) {
   `;
 }
 
-function renderVisibleTraitValue(character, trait, isPublic) {
+function renderVisibleTraitValue(character, trait, isPublic, options = {}) {
   let value;
   const tone = getTraitTone(character, trait);
   const revealClass = isNewlyRevealedTrait(character.number, trait.key)
@@ -1374,6 +1386,8 @@ function renderVisibleTraitValue(character, trait, isPublic) {
     value = renderHealthValue(character, tone);
   } else if (trait.key === "specialAbility") {
     value = renderTraitSignal(renderSpecialAbilities(character), tone);
+  } else if (options.view === VIEW_TABLE && shouldShowFantasyRaceWithGender(character, trait)) {
+    value = renderTraitSignal(renderFantasyRaceGenderValue(character), tone);
   } else {
     value = renderTraitSignal(`<span class="trait-value">${escapeHtml(character[trait.key])}</span>`, tone);
   }
@@ -1413,6 +1427,40 @@ function renderVisibilityBadge(playerNumber, isPublic) {
   }
 
   return "";
+}
+
+function isFantasyPackActive() {
+  const themeId = currentPack?.settings?.theme || currentPack?.themeId || themeSelect?.value || DEFAULT_THEME_ID;
+  return getThemeById(themeId).id === "fantasy";
+}
+
+function getFantasyRaceGenderLines(character) {
+  const race = cleanText(character?.race, "");
+  const gender = cleanText(character?.gender, "");
+
+  if (!race || race === "Не указано") {
+    return gender ? [gender] : [];
+  }
+
+  return gender ? [race, gender] : [race];
+}
+
+function shouldShowFantasyRaceWithGender(character, trait) {
+  return trait.key === "gender" && isFantasyPackActive() && getFantasyRaceGenderLines(character).length > 1;
+}
+
+function renderFantasyRaceGenderValue(character) {
+  const lines = getFantasyRaceGenderLines(character);
+
+  if (lines.length === 0) {
+    return `<span class="trait-value">Не указано</span>`;
+  }
+
+  return `
+    <span class="trait-value trait-value-stacked">
+      ${lines.map((line) => `<span>${escapeHtml(line)}</span>`).join("")}
+    </span>
+  `;
 }
 
 function renderTraitSignal(content, tone) {

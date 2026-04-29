@@ -590,6 +590,20 @@
   white-space: normal;
 }
 
+.players-table-cell .trait-value-stacked {
+  display: grid;
+  gap: 2px;
+  -webkit-line-clamp: unset;
+  -webkit-box-orient: initial;
+}
+
+.players-table-cell .trait-value-stacked span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+}
+
 .players-table-cell .trait-signal {
   max-width: 100%;
   overflow: hidden;
