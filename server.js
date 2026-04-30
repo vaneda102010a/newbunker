@@ -1266,8 +1266,8 @@ function sendReply(reply, payload) {
   }
 }
 
-server.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`Bunker generator is running on port ${PORT}`);
   console.log(`Public URL: ${PUBLIC_URL}`);
-  console.log(`Cards API: ${PUBLIC_URL}/api/cards/${DEFAULT_THEME_ID}`);
+  console.log(`Cards API: ${PUBLIC_URL}/api/cards/classic`);
 });
