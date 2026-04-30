@@ -172,13 +172,27 @@ function advanceLobbyTurn(lobby) {
   return lobby.currentTurnIndex;
 }
 
-app.get(["/", "/index.html"], (req, res) => {
-  res.sendFile(path.join(PROJECT_ROOT, "index.html"));
+function sendProjectFile(res, filePath) {
+  res.sendFile(filePath, (error) => {
+    if (!error || res.headersSent) {
+      return;
+    }
+
+    res.status(error.statusCode || error.status || 500).send("File not found");
+  });
+}
+
+app.get("/", (req, res) => {
+  res.send("OK");
+});
+
+app.get("/index.html", (req, res) => {
+  sendProjectFile(res, path.join(PROJECT_ROOT, "index.html"));
 });
 
 Object.entries(STATIC_FILES).forEach(([route, fileName]) => {
   app.get(route, (req, res) => {
-    res.sendFile(path.join(PROJECT_ROOT, fileName));
+    sendProjectFile(res, path.join(PROJECT_ROOT, fileName));
   });
 });
 
@@ -203,11 +217,20 @@ app.get("/api/cards/:theme", (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
   res.setHeader("X-Theme-Id", themeId);
-  res.sendFile(filePath);
+  sendProjectFile(res, filePath);
 });
 
 app.get("/healthz", (req, res) => {
   res.status(200).send("ok");
+});
+
+app.use((error, req, res, next) => {
+  if (res.headersSent) {
+    next(error);
+    return;
+  }
+
+  res.status(error.statusCode || error.status || 500).send("Server error");
 });
 
 app.use((req, res) => {
