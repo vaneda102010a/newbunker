@@ -900,7 +900,15 @@ table tbody tr:nth-child(even) {
 }
 
 table tbody tr:hover {
-  background: rgba(138, 43, 226, 0.2);
+  /* hover highlight intentionally disabled for turn-based UI */
+  /* background: rgba(138, 43, 226, 0.2); */
+}
+
+/* Highlight for last changed cell */
+.last-changed {
+  outline: 2px solid #00ff00;
+  background: rgba(0, 255, 0, 0.1) !important;
+  transition: all 0.5s;
 }
 
 /* Header emphasis */

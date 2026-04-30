@@ -162,7 +162,9 @@ function advanceLobbyTurn(lobby) {
 
   // broadcast nextTurn event to room
   try {
-    io.to(lobby.roomCode).emit("nextTurn", { nextPlayerId: lobby.players[nextIndex]?.id || null, nextPlayerIndex: nextIndex });
+    const payload = { nextPlayerId: lobby.players[nextIndex]?.id || null, nextPlayerIndex: nextIndex };
+    io.to(lobby.roomCode).emit("nextTurn", payload);
+    io.to(lobby.roomCode).emit("updateTurn", payload);
   } catch (e) {
     // ignore
   }
@@ -357,12 +359,24 @@ io.on("connection", (socket) => {
     }
     
     // Remove player from lobby
+    const removedIndex = lobby.players.findIndex(p => p.id === playerId);
+    const removedPlayer = removedIndex !== -1 ? lobby.players[removedIndex] : null;
     lobby.players = lobby.players.filter(p => p.id !== playerId);
 
     // Also remove from room.players if present
     const roomObj = rooms.get(normalizeRoomCode(normalizedCode));
     if (roomObj) {
       roomObj.players = roomObj.players.filter(rp => rp.socketId !== playerToKick.socketId);
+    }
+
+    // If removed player was current, advance turn
+    if (lobby.isGameStarted && removedPlayer) {
+      // if removedIndex is the current index, advance; otherwise adjust index
+      if (removedIndex === lobby.currentTurnIndex) {
+        advanceLobbyTurn(lobby);
+      } else if (removedIndex < lobby.currentTurnIndex) {
+        lobby.currentTurnIndex = Math.max(0, lobby.currentTurnIndex - 1);
+      }
     }
     
     console.log(`Player ${playerToKick.name} (${playerId}) was kicked from lobby ${normalizedCode}`);
@@ -397,13 +411,17 @@ io.on("connection", (socket) => {
     try {
       const targetSocket = io.sockets.sockets.get(playerToKick.socketId);
       if (targetSocket) {
-        targetSocket.disconnect(true);
+        try { targetSocket.emit('kicked', { roomCode: normalizedCode }); } catch (e) {}
+        // give client a moment to show message
+        setTimeout(() => { try { targetSocket.disconnect(true); } catch (e) {} }, 120);
       }
     } catch (err) {
       // ignore
     }
 
     // Remove player from lobby and room
+    const removedIndex = lobby.players.findIndex(p => p.id === playerId);
+    const removedPlayer = removedIndex !== -1 ? lobby.players[removedIndex] : null;
     lobby.players = lobby.players.filter(p => p.id !== playerId);
     const roomObj = rooms.get(normalizeRoomCode(normalizedCode));
     if (roomObj) {
@@ -411,8 +429,33 @@ io.on("connection", (socket) => {
       roomObj.gameLog.push(`${playerToKick.name} был исключён ведущим`);
     }
 
+    if (lobby.isGameStarted && removedPlayer) {
+      if (removedIndex === lobby.currentTurnIndex) {
+        advanceLobbyTurn(lobby);
+      } else if (removedIndex < lobby.currentTurnIndex) {
+        lobby.currentTurnIndex = Math.max(0, lobby.currentTurnIndex - 1);
+      }
+    }
+
     sendReply(reply, { ok: true });
     broadcastLobby(normalizedCode);
+    broadcastRoom(normalizedCode);
+  });
+
+  // ability-applied notification from host -> broadcast to room
+  socket.on("ability-applied", ({ roomCode, actorNumber, actorName, abilityText, targetNumber, traitKey, newValue } = {}) => {
+    const normalizedCode = normalizeRoomCode(roomCode);
+    const room = rooms.get(normalizedCode);
+    if (!room) return;
+
+    const actor = actorName || `Игрок ${actorNumber}`;
+    const target = targetNumber ? `Игрок ${targetNumber}` : 'неизвестная цель';
+    const entry = `${actor} -> ${abilityText} -> ${target}. Результат: ${traitKey || 'характеристика'} изменена на ${newValue}`;
+    room.gameLog = room.gameLog || [];
+    room.gameLog.push(entry);
+
+    // broadcast to all players a friendly event
+    io.to(normalizedCode).emit('abilityApplied', { actorName, actorNumber, abilityText, targetNumber, traitKey, newValue });
     broadcastRoom(normalizedCode);
   });
   
@@ -765,12 +808,20 @@ io.on("connection", (socket) => {
       player.connected = false;
       if (room.hostId === socket.id) {
         room.gameLog.push("Ведущий отключился");
-      } else {
-        room.gameLog.push(`${player.name} отключился`);
-      }
-      if (room.voting?.active && allActiveParticipantsVoted(room)) {
-        resolveVotingRound(room.roomCode, "all-voted");
-        return;
+        // If the disconnected player was the current player, advance the turn
+        const normalizedCode = normalizeRoomCode(lobby.roomCode);
+        if (lobby.isGameStarted && lobby.players.length > 0) {
+          const current = lobby.players[lobby.currentTurnIndex];
+          if (current && current.socketId === socket.id) {
+            advanceLobbyTurn(lobby);
+          }
+        }
+
+        // Broadcast update
+        const room = rooms.get(normalizeRoomCode(lobby.roomCode));
+        if (room) {
+          broadcastLobby(normalizedCode);
+        }
       }
       broadcastRoom(room.roomCode);
     });

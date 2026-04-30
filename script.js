@@ -198,6 +198,9 @@ let currentRoomCode = "";
 let currentSocketId = "";
 let roomPlayers = [];
 let localPlayerId = null;
+let currentLobby = null;
+let lastChangedCell = null;
+let isKicked = false;
 let characterView = getSavedCharacterView();
 let pendingCreateRoomName = "";
 let pendingApprovedRequest = null;
@@ -404,6 +407,12 @@ function isOnlineRoom() {
 }
 
 function canRevealTrait(playerNumber) {
+  // Only the active player can use reveal buttons for their slot.
+  // Host has separate controls and should not use per-player reveal buttons.
+  if (currentLobby && currentLobby.isGameStarted) {
+    return isCharacterActive(playerNumber) && isOwnPlayer(playerNumber);
+  }
+
   return isHostView() || isOwnPlayer(playerNumber);
 }
 
@@ -539,6 +548,48 @@ function initializeSocket() {
       // ignore
     }
   });
+  socket.on("abilityApplied", (payload) => {
+    // payload: { actorName, abilityText, targetNumber, traitKey, newValue }
+    try {
+      const actor = payload?.actorName || `Игрок ${payload?.actorNumber || '?'}`;
+      const ability = payload?.abilityText || 'способность';
+      const target = payload?.targetNumber ? `Игрок ${payload.targetNumber}` : 'вас';
+      const newVal = payload?.newValue || '';
+      // show toast
+      showNotification(`${actor} применил ${ability} против ${target}. Теперь: ${payload.traitKey || 'характеристика'} = ${newVal}`, 'info');
+      // add to journal
+      addGameLog(`${actor} -> ${ability} -> ${target}. Результат: ${payload.traitKey || 'характеристика'} изменена на ${newVal}`);
+      renderGameLog();
+      // highlight changed cell
+      if (payload?.targetNumber && payload?.traitKey) {
+        highlightTraitCell(payload.targetNumber, payload.traitKey);
+      }
+    } catch (e) {}
+  });
+
+  socket.on('kicked', ({ roomCode } = {}) => {
+    try {
+      isKicked = true;
+      if (roomCode) localStorage.setItem(`bunker_kicked_${roomCode}`, '1');
+      try { localStorage.removeItem(`bunker_player_${roomCode}`); } catch (e) {}
+      // stop audio if any
+      const audios = document.querySelectorAll('audio');
+      audios.forEach(a => { try { a.pause(); a.currentTime = 0; } catch (e) {} });
+      // show modal/fullscreen message
+      const div = document.createElement('div');
+      div.style.position = 'fixed';
+      div.style.inset = '0';
+      div.style.zIndex = '99999';
+      div.style.display = 'grid';
+      div.style.placeItems = 'center';
+      div.style.background = 'rgba(0,0,0,0.85)';
+      div.style.color = '#fff';
+      div.style.fontSize = '20px';
+      div.style.textAlign = 'center';
+      div.innerHTML = `<div style="max-width:600px;padding:24px;border-radius:12px;background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.06)">Вы были исключены из комнаты ведущим.<br><br>Обновите страницу, чтобы попытаться подключиться снова.</div>`;
+      document.body.appendChild(div);
+    } catch (e) {}
+  });
   socket.on("disconnect", () => {
     setStatus("Соединение с комнатой потеряно. Переподключение...", "error");
   });
@@ -577,6 +628,11 @@ function createOnlineRoomAfterConfirm(playerName) {
 }
 
 function emitCreateRoom(playerName) {
+  if (isKicked || (currentRoomCode && localStorage.getItem(`bunker_kicked_${currentRoomCode}`))) {
+    setStatus("Вы были исключены и не можете создать новую комнату без перезагрузки.", "error");
+    return;
+  }
+
   if (!socket?.connected) {
     pendingCreateRoomName = playerName;
     return;
@@ -587,6 +643,10 @@ function emitCreateRoom(playerName) {
 }
 
 function joinOnlineRoom() {
+  if (isKicked || (roomCodeInput && localStorage.getItem(`bunker_kicked_${roomCodeInput.value.toUpperCase()}`))) {
+    setStatus("Вы были исключены и не можете присоединиться без перезагрузки.", "error");
+    return;
+  }
   if (!socket?.connected) {
     setStatus("Нет соединения с сервером комнат.", "error");
     return;
@@ -641,6 +701,7 @@ function handleRoomReply(response) {
 
 function applyLobbyState(lobby) {
   if (!lobby) return;
+  currentLobby = lobby;
   currentRoomCode = lobby.roomCode || currentRoomCode;
 
   // Render players with kick buttons for host
@@ -666,6 +727,73 @@ function applyLobbyState(lobby) {
       startGameButton.hidden = true;
     }
   }
+}
+
+// Notifications (simple toast)
+function ensureToastContainer() {
+  let container = document.querySelector('.toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.className = 'toast-container';
+    container.style.position = 'fixed';
+    container.style.right = '18px';
+    container.style.top = '18px';
+    container.style.zIndex = '9999';
+    document.body.appendChild(container);
+  }
+  return container;
+}
+
+function showNotification(message, type = 'info') {
+  const container = ensureToastContainer();
+  const div = document.createElement('div');
+  div.className = `toast toast-${type}`;
+  div.style.marginTop = '8px';
+  div.style.padding = '10px 14px';
+  div.style.borderRadius = '10px';
+  div.style.background = type === 'error' ? 'rgba(255,100,100,0.95)' : type === 'success' ? 'rgba(0,160,80,0.95)' : 'rgba(30,30,30,0.9)';
+  div.style.color = '#fff';
+  div.textContent = message;
+  container.appendChild(div);
+  setTimeout(() => {
+    div.style.transition = 'opacity 0.3s ease';
+    div.style.opacity = '0';
+    setTimeout(() => div.remove(), 350);
+  }, 5000);
+}
+
+// Highlight a table cell for a player trait
+function highlightTraitCell(playerNumber, traitKey) {
+  try {
+    // remove previous
+    if (lastChangedCell) {
+      lastChangedCell.classList.remove('last-changed');
+      lastChangedCell = null;
+    }
+
+    const table = document.querySelector('.players-table');
+    if (!table) return;
+    const row = table.querySelector(`tr[data-player="${playerNumber}"]`);
+    if (!row) return;
+    const cell = row.querySelector(`.players-table-cell.trait-${traitKey}`);
+    if (!cell) return;
+    cell.classList.add('last-changed');
+    lastChangedCell = cell;
+  } catch (e) {
+    // ignore
+  }
+}
+
+function isCharacterActive(characterNumber) {
+  if (!currentLobby) return false;
+  const currentPlayerId = currentLobby.currentPlayerId;
+  if (!currentPlayerId) return false;
+  const lobbyPlayer = (currentLobby.players || []).find((p) => p.id === currentPlayerId);
+  if (!lobbyPlayer) return false;
+  // find corresponding room player by socketId
+  const slotPlayer = roomPlayers.find((rp) => rp.socketId === lobbyPlayer.socketId);
+  if (!slotPlayer) return false;
+  return Number(slotPlayer.playerNumber) === Number(characterNumber);
 }
 
 // Handle kick button clicks
@@ -799,10 +927,27 @@ function approveAbilityRequest(request) {
   const abilityKey = getAbilityKey(context.actorNumber, context.abilityIndex);
   usedAbilities[abilityKey] = true;
   addGameLog(`Ведущий подтвердил способность Игрока ${context.actorNumber}`);
-  executeAbility(context);
+  const wasApplied = executeAbility(context);
   renderPack(currentPack);
   renderGameLog();
   syncHostState(request.id);
+  // Notify server about applied ability so it can broadcast to others
+  if (isOnlineRoom() && isHostView() && wasApplied !== false) {
+    const actorName = getRoomPlayerForSlot(context.actorNumber)?.name || `Игрок ${context.actorNumber}`;
+    const abilityText = context.analysis?.raw || context.analysis?.text || (context.traitKey || 'способность');
+    const targetNumber = context.targetNumber || null;
+    const traitKey = context.traitKey || null;
+    const newValue = traitKey ? (getPlayerByNumber(targetNumber)?.[traitKey] || null) : null;
+    socket.emit('ability-applied', {
+      roomCode: currentRoomCode,
+      actorNumber: context.actorNumber,
+      actorName,
+      abilityText,
+      targetNumber,
+      traitKey,
+      newValue
+    });
+  }
 }
 
 function createEmptyCardDatabase() {
@@ -1841,8 +1986,9 @@ function renderLockButton(playerNumber, traitKey, label, isDisabled = false) {
 }
 
 function renderTraitRevealAction(playerNumber, traitKey, label) {
+  const disabled = !(currentLobby && currentLobby.isGameStarted ? isCharacterActive(playerNumber) && isOwnPlayer(playerNumber) : canRevealTrait(playerNumber));
   return `
-    <button class="trait-mini-action" type="button" data-action="reveal-trait" data-player="${playerNumber}" data-trait="${traitKey}" aria-label="Открыть ${label} для всех">
+    <button class="trait-mini-action" type="button" data-action="reveal-trait" data-player="${playerNumber}" data-trait="${traitKey}" aria-label="Открыть ${label} для всех" ${disabled ? "disabled" : ""}>
       🔒
     </button>
   `;
@@ -2450,26 +2596,34 @@ function executeAbility(context) {
 
   if (context.analysis.type === "swap") {
     applySwapAbility(context);
+    // highlight swapped trait cells
+    highlightTraitCell(context.actorNumber, context.traitKey);
     return true;
   }
 
   if (context.analysis.type === "steal") {
     applyStealAbility(context);
+    highlightTraitCell(context.actorNumber, context.traitKey);
     return true;
   }
 
   if (context.analysis.type === "reveal") {
     applyRevealAbility(context);
+    // reveal may highlight multiple traits; highlight the revealed trait if provided
+    if (context.traitKey) highlightTraitCell(context.targetNumber || context.actorNumber, context.traitKey);
     return true;
   }
 
   if (context.analysis.type === "reroll") {
     applyRerollAbility(context);
+    if (context.traitKey) highlightTraitCell(context.targetNumber || context.actorNumber, context.traitKey);
     return true;
   }
 
   if (context.analysis.type === "defense") {
     applyDefenseAbility(context);
+    // defense doesn't change a visible trait but show notification
+    highlightTraitCell(context.actorNumber, 'specialAbility');
     return true;
   }
 
