@@ -182,11 +182,7 @@ function sendProjectFile(res, filePath) {
   });
 }
 
-app.get("/", (req, res) => {
-  res.send("OK");
-});
-
-app.get("/index.html", (req, res) => {
+app.get(["/", "/index.html"], (req, res) => {
   sendProjectFile(res, path.join(PROJECT_ROOT, "index.html"));
 });
 
