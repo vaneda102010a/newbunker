@@ -228,13 +228,21 @@
   <div class="modal-backdrop" id="votingModal" hidden>
     <div class="confirm-modal voting-modal" role="dialog" aria-modal="true" aria-labelledby="votingTitle">
       <button class="modal-close-button" id="votingCloseButton" type="button" aria-label="Закрыть">×</button>
-      <span class="eyebrow">Отбор</span>
-      <h3 id="votingTitle">Голосование</h3>
+      <div class="voting-modal-head">
+        <div>
+          <span class="eyebrow">Отбор</span>
+          <h3 id="votingTitle">Голосование</h3>
+        </div>
+        <div class="voting-timer" id="votingTimer">30</div>
+      </div>
+      <div class="voting-status" id="votingStatus" aria-live="polite"></div>
+      <div class="voting-setup" id="votingSetup" hidden></div>
       <div class="voting-list" id="votingList"></div>
+      <div class="voting-participants" id="votingParticipants"></div>
       <div class="voting-results" id="votingResults" aria-live="polite" hidden></div>
       <div class="modal-actions">
-        <button class="main-button" id="votingFinishButton" type="button">Завершить</button>
-        <button class="ghost-button" id="votingResetButton" type="button">Новое</button>
+        <button class="main-button" id="votingFinishButton" type="button">Начать</button>
+        <button class="ghost-button" id="votingResetButton" type="button">Пропустить</button>
       </div>
     </div>
   </div>
