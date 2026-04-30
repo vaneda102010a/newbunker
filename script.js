@@ -4,7 +4,7 @@ const ROLE_PLAYER = "player";
 const VIEW_CARDS = "cards";
 const VIEW_TABLE = "table";
 const CHARACTER_VIEW_STORAGE_KEY = "bunkerCharacterView";
-const PUBLIC_APP_URL = "https://bunker-s4n4.onrender.com";
+const PUBLIC_APP_URL = "http://198.211.104.191:3000";
 const DEFAULT_THEME_ID = "classic";
 const themes = [
   { id: "classic", name: "Классическая" },
