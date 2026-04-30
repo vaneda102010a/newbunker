@@ -71,7 +71,8 @@ function createOrGetLobby(roomCode) {
       players: [],
       state: "WAITING_LOBBY",
       hostId: null,
-      turnIndex: 0,
+      currentTurnIndex: 0,
+      isGameStarted: false,
       currentTurnStartedAt: null
     };
     lobbies.set(roomCode, lobby);
@@ -93,10 +94,10 @@ function getLobbyPlayerBySocketId(lobby, socketId) {
 }
 
 function getCurrentPlayer(lobby) {
-  if (lobby.state !== "IN_GAME" || lobby.players.length === 0) {
+  if (!lobby?.isGameStarted || lobby.players.length === 0) {
     return null;
   }
-  return lobby.players[lobby.turnIndex % lobby.players.length];
+  return lobby.players[lobby.currentTurnIndex % lobby.players.length];
 }
 
 function serializeLobby(lobby) {
@@ -107,7 +108,8 @@ function serializeLobby(lobby) {
     roomCode: lobby.roomCode,
     state: lobby.state,
     hostId: lobby.hostId,
-    turnIndex: lobby.turnIndex,
+    currentTurnIndex: lobby.currentTurnIndex,
+    isGameStarted: Boolean(lobby.isGameStarted),
     currentTurnStartedAt: lobby.currentTurnStartedAt,
     currentPlayerId: currentPlayer?.id || null,
     players: lobby.players.map(p => ({
@@ -136,6 +138,36 @@ function broadcastLobby(roomCode) {
       publicUrl: PUBLIC_URL
     });
   });
+}
+
+function advanceLobbyTurn(lobby) {
+  if (!lobby || !Array.isArray(lobby.players) || lobby.players.length === 0) return;
+
+  // ensure game started
+  if (!lobby.isGameStarted) {
+    lobby.isGameStarted = true;
+  }
+
+  const prevIndex = Number(lobby.currentTurnIndex) || 0;
+  const prevPlayer = lobby.players[prevIndex];
+  if (prevPlayer) {
+    // reset their reveal flag at end of their turn
+    prevPlayer.hasRevealedThisTurn = false;
+  }
+
+  // advance
+  const nextIndex = (prevIndex + 1) % lobby.players.length;
+  lobby.currentTurnIndex = nextIndex;
+  lobby.currentTurnStartedAt = Date.now();
+
+  // broadcast nextTurn event to room
+  try {
+    io.to(lobby.roomCode).emit("nextTurn", { nextPlayerId: lobby.players[nextIndex]?.id || null, nextPlayerIndex: nextIndex });
+  } catch (e) {
+    // ignore
+  }
+
+  return lobby.currentTurnIndex;
 }
 
 app.get(["/", "/index.html"], (req, res) => {
@@ -283,9 +315,10 @@ io.on("connection", (socket) => {
     
     // Start game
     lobby.state = "IN_GAME";
-    lobby.turnIndex = 0;
+    lobby.isGameStarted = true;
+    lobby.currentTurnIndex = 0;
     lobby.currentTurnStartedAt = Date.now();
-    
+
     // Reset turn flags
     lobby.players.forEach(p => {
       p.hasRevealedThisTurn = false;
@@ -295,6 +328,9 @@ io.on("connection", (socket) => {
     
     sendReply(reply, { ok: true });
     broadcastLobby(normalizedCode);
+    // notify nextTurn
+    const next = getCurrentPlayer(lobby);
+    io.to(normalizedCode).emit("nextTurn", { nextPlayerId: next?.id || null, nextPlayerIndex: lobby.currentTurnIndex });
   });
   
   socket.on("kick-player", ({ roomCode, playerId } = {}, reply) => {
@@ -322,11 +358,62 @@ io.on("connection", (socket) => {
     
     // Remove player from lobby
     lobby.players = lobby.players.filter(p => p.id !== playerId);
+
+    // Also remove from room.players if present
+    const roomObj = rooms.get(normalizeRoomCode(normalizedCode));
+    if (roomObj) {
+      roomObj.players = roomObj.players.filter(rp => rp.socketId !== playerToKick.socketId);
+    }
     
     console.log(`Player ${playerToKick.name} (${playerId}) was kicked from lobby ${normalizedCode}`);
     
     sendReply(reply, { ok: true });
     broadcastLobby(normalizedCode);
+  });
+
+  // New camelCase event: kickPlayer (for client compatibility)
+  socket.on("kickPlayer", ({ roomCode, playerId } = {}, reply) => {
+    const normalizedCode = normalizeRoomCode(roomCode);
+    const lobby = getLobbyByRoomCode(normalizedCode);
+
+    if (!lobby) {
+      sendReply(reply, { ok: false, error: "Лобби не найдено" });
+      return;
+    }
+
+    const hostPlayer = getLobbyPlayerBySocketId(lobby, socket.id);
+    if (!hostPlayer || !hostPlayer.isHost) {
+      sendReply(reply, { ok: false, error: "Только хост может исключать игроков" });
+      return;
+    }
+
+    const playerToKick = getLobbyPlayer(lobby, playerId);
+    if (!playerToKick) {
+      sendReply(reply, { ok: false, error: "Игрок не найден" });
+      return;
+    }
+
+    // Attempt to disconnect the player's socket if connected
+    try {
+      const targetSocket = io.sockets.sockets.get(playerToKick.socketId);
+      if (targetSocket) {
+        targetSocket.disconnect(true);
+      }
+    } catch (err) {
+      // ignore
+    }
+
+    // Remove player from lobby and room
+    lobby.players = lobby.players.filter(p => p.id !== playerId);
+    const roomObj = rooms.get(normalizeRoomCode(normalizedCode));
+    if (roomObj) {
+      roomObj.players = roomObj.players.filter(rp => rp.socketId !== playerToKick.socketId);
+      roomObj.gameLog.push(`${playerToKick.name} был исключён ведущим`);
+    }
+
+    sendReply(reply, { ok: true });
+    broadcastLobby(normalizedCode);
+    broadcastRoom(normalizedCode);
   });
   
   socket.on("reveal-characteristic", ({ roomCode, characteristicKey } = {}, reply) => {
@@ -338,7 +425,7 @@ io.on("connection", (socket) => {
       return;
     }
     
-    if (lobby.state !== "IN_GAME") {
+    if (!lobby.isGameStarted) {
       sendReply(reply, { ok: false, error: "Игра не начата" });
       return;
     }
@@ -368,11 +455,14 @@ io.on("connection", (socket) => {
       return;
     }
     
-    // Mark as revealed
+    // Mark as revealed (one reveal per turn)
     player.hasRevealedThisTurn = true;
-    
+
     console.log(`Player ${player.name} revealed characteristic: ${characteristicKey}`);
-    
+
+    // After revealing, automatically end the turn and advance
+    advanceLobbyTurn(lobby);
+
     sendReply(reply, { ok: true });
     broadcastLobby(normalizedCode);
   });
@@ -386,7 +476,7 @@ io.on("connection", (socket) => {
       return;
     }
     
-    if (lobby.state !== "IN_GAME") {
+    if (!lobby.isGameStarted) {
       sendReply(reply, { ok: false, error: "Игра не начата" });
       return;
     }
@@ -410,19 +500,11 @@ io.on("connection", (socket) => {
       return;
     }
     
-    // Reset turn flag
-    currentPlayer.hasRevealedThisTurn = false;
-    
-    // Move to next player
-    lobby.turnIndex++;
-    if (lobby.turnIndex >= lobby.players.length) {
-      lobby.turnIndex = 0;
-    }
-    
-    lobby.currentTurnStartedAt = Date.now();
-    
-    console.log(`Turn ended in lobby ${normalizedCode}. Next player: ${lobby.players[lobby.turnIndex]?.name}`);
-    
+    // Use shared advance logic
+    advanceLobbyTurn(lobby);
+
+    console.log(`Turn ended in lobby ${normalizedCode}. Next player: ${lobby.players[lobby.currentTurnIndex]?.name}`);
+
     sendReply(reply, { ok: true });
     broadcastLobby(normalizedCode);
   });
