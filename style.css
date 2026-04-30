@@ -1407,6 +1407,202 @@
   transform: translateY(0);
 }
 
+.voting-modal {
+  width: min(760px, calc(100vw - 28px));
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.025)),
+    rgba(9, 11, 14, 0.86);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 0 34px var(--reveal-glow),
+    var(--shadow);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.voting-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px 54px 16px 22px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.voting-modal h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.voting-timer {
+  display: grid;
+  place-items: center;
+  min-width: 74px;
+  height: 54px;
+  border: 1px solid var(--table-hover-ring);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 50% 15%, var(--reveal-glow), transparent 62%),
+    rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font-size: 28px;
+  font-weight: 820;
+  line-height: 1;
+  text-shadow: 0 0 18px var(--reveal-glow);
+}
+
+.voting-timer[hidden] {
+  display: none;
+}
+
+.voting-status {
+  margin: 0;
+  padding: 12px 22px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: rgba(245, 245, 247, 0.78);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.voting-setup,
+.voting-list,
+.voting-participants,
+.voting-results {
+  margin-left: 22px;
+  margin-right: 22px;
+}
+
+.voting-setup {
+  margin-top: 16px;
+}
+
+.voting-setup[hidden] {
+  display: none;
+}
+
+.voting-setup-grid,
+.voting-list {
+  display: grid;
+  gap: 9px;
+  max-height: min(44vh, 390px);
+  overflow-y: auto;
+}
+
+.voting-candidate-toggle,
+.voting-candidate-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.voting-candidate-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.voting-candidate-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: color-mix(in srgb, var(--accent, #9b5cff) 70%, #ffffff);
+}
+
+.voting-candidate-toggle span,
+.voting-candidate-card div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.voting-candidate-toggle strong,
+.voting-candidate-card strong {
+  color: rgba(245, 245, 247, 0.94);
+  font-size: 13px;
+}
+
+.voting-candidate-toggle small,
+.voting-candidate-card span {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(245, 245, 247, 0.62);
+  font-size: 12px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voting-vote-button {
+  min-width: 128px;
+  height: 34px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.voting-participants {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 11px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.voting-participants > span {
+  color: var(--muted-2);
+  font-size: 11px;
+  font-weight: 780;
+  text-transform: uppercase;
+}
+
+.voting-participants > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.voting-participants strong {
+  padding: 4px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(245, 245, 247, 0.6);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.voting-participants strong.voted {
+  border-color: rgba(183, 232, 196, 0.22);
+  color: rgba(183, 232, 196, 0.9);
+}
+
+.voting-results {
+  margin-top: 14px;
+  margin-bottom: 0;
+}
+
+.voting-modal .modal-actions {
+  padding: 16px 22px 22px;
+}
+
+.voting-empty {
+  padding: 14px;
+  border: 1px dashed var(--border-soft);
+  border-radius: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
 @media (max-width: 720px) {
   .title-block h1 {
       font-size: 32px;

@@ -130,7 +130,11 @@ const helpModal = document.querySelector("#helpModal");
 const helpCloseButton = document.querySelector("#helpCloseButton");
 const votingModal = document.querySelector("#votingModal");
 const votingCloseButton = document.querySelector("#votingCloseButton");
+const votingTimer = document.querySelector("#votingTimer");
+const votingStatus = document.querySelector("#votingStatus");
+const votingSetup = document.querySelector("#votingSetup");
 const votingList = document.querySelector("#votingList");
+const votingParticipants = document.querySelector("#votingParticipants");
 const votingResults = document.querySelector("#votingResults");
 const votingFinishButton = document.querySelector("#votingFinishButton");
 const votingResetButton = document.querySelector("#votingResetButton");
@@ -195,9 +199,11 @@ let roomPlayers = [];
 let characterView = getSavedCharacterView();
 let pendingCreateRoomName = "";
 let pendingApprovedRequest = null;
-let votingVotes = {};
-let votingIsActive = false;
-let votingResult = null;
+let votingState = null;
+let votingSetupOpen = false;
+let localVotingCandidates = new Set();
+let votingCountdownTimer = null;
+let dismissedVotingId = "";
 const handledAbilityRequests = new Set();
 const cardDatabaseCache = new Map();
 const fallbackThemeEngine = {
@@ -614,6 +620,7 @@ function applyRoomState({ room, currentUser }) {
   usedAbilities = room.usedAbilities || {};
   protectedPlayers = new Set(room.protectedPlayers || []);
   gameLog = room.gameLog || [];
+  votingState = room.voting || null;
 
   if (room.generatedPack) {
     currentPack = room.generatedPack;
@@ -629,6 +636,8 @@ function applyRoomState({ room, currentUser }) {
   }
 
   renderRoomInfo(room);
+  renderGameLog();
+  renderVotingFromState();
 }
 
 function renderRoomInfo(room) {
@@ -2131,9 +2140,10 @@ function resetGameState(pack) {
   protectedPlayers = new Set();
   gameLog = [];
   pendingAbility = null;
-  votingVotes = {};
-  votingIsActive = false;
-  votingResult = null;
+  votingState = null;
+  votingSetupOpen = false;
+  localVotingCandidates = new Set();
+  dismissedVotingId = "";
   closeVotingModal();
   closeSurvivalModal();
   closeAbilityModal();
@@ -2648,10 +2658,6 @@ function getVotingPlayers() {
   return currentPack?.players || [];
 }
 
-function getVotingEligiblePlayers() {
-  return getVotingPlayers().filter((player) => !excludedPlayers.has(player.number));
-}
-
 function getVotingPlayerLabel(playerNumber) {
   const player = getPlayerByNumber(playerNumber);
   const slotName = getRoomPlayerForSlot(playerNumber)?.name || "";
@@ -2661,113 +2667,241 @@ function getVotingPlayerLabel(playerNumber) {
   return profession ? `${name} · ${profession}` : name;
 }
 
-function openVotingModal(resetSession = false) {
+function getActiveVotingPlayers() {
+  if (!currentPack?.players?.length) {
+    return [];
+  }
+
+  const generatedNumbers = new Set(currentPack.players.map((player) => Number(player.number)));
+
+  if (isOnlineRoom()) {
+    return roomPlayers
+      .filter((player) => player.connected)
+      .filter((player) => Number(player.playerNumber))
+      .filter((player) => generatedNumbers.has(Number(player.playerNumber)))
+      .filter((player) => !excludedPlayers.has(Number(player.playerNumber)))
+      .map((player) => ({
+        number: Number(player.playerNumber),
+        name: player.name || `Игрок ${player.playerNumber}`,
+        isHost: Boolean(player.isHost)
+      }));
+  }
+
+  return currentPack.players
+    .filter((player) => !excludedPlayers.has(player.number))
+    .map((player) => ({
+      number: player.number,
+      name: `Игрок ${player.number}`,
+      isHost: player.number === currentPlayerNumber
+    }));
+}
+
+function openVotingModal(resetSetup = false) {
   if (!currentPack?.players?.length) {
     setStatus("Сначала сгенерируйте пак.", "error");
     return;
   }
 
-  if (resetSession || !votingIsActive) {
-    startVotingSession();
+  if (resetSetup && isHostView() && !votingState?.active) {
+    localVotingCandidates = new Set(getActiveVotingPlayers().map((player) => player.number));
+    votingSetupOpen = true;
+    dismissedVotingId = "";
+    renderVotingModal();
+    votingModal.hidden = false;
+    return;
   }
 
+  if (votingState?.active || votingState?.status === "ended") {
+    votingSetupOpen = false;
+    dismissedVotingId = "";
+    renderVotingModal();
+    votingModal.hidden = false;
+    startVotingCountdown();
+    return;
+  }
+
+  if (!isHostView()) {
+    setStatus("Голосование может начать только ведущий.", "error");
+    return;
+  }
+
+  if (!isOnlineRoom()) {
+    setStatus("Голосование доступно в онлайн-комнате, чтобы игроки могли голосовать со своих устройств.", "error");
+    return;
+  }
+
+  if (resetSetup || !localVotingCandidates.size) {
+    localVotingCandidates = new Set(getActiveVotingPlayers().map((player) => player.number));
+  }
+
+  votingSetupOpen = true;
   renderVotingModal();
   votingModal.hidden = false;
 }
 
-function startVotingSession() {
-  votingVotes = {};
-  votingResult = null;
-  votingIsActive = true;
-  addGameLog("Голосование началось");
-  renderGameLog();
-  syncHostState();
-}
-
 function renderVotingModal() {
-  if (!votingList || !votingResults) {
+  if (!votingList || !votingResults || !votingStatus || !votingSetup || !votingParticipants) {
     return;
   }
 
-  const players = getVotingPlayers();
-  const targets = getVotingEligiblePlayers();
-  votingList.innerHTML = players.map((player) => renderVotingRow(player, targets)).join("");
+  const showSetup = votingSetupOpen && isHostView() && !votingState?.active && votingState?.status !== "ended";
+  votingSetup.hidden = !showSetup;
+  votingTimer.hidden = showSetup;
 
-  if (votingResult) {
+  if (showSetup) {
+    renderVotingSetup();
+    votingList.innerHTML = "";
+    votingParticipants.innerHTML = "";
+    votingResults.hidden = true;
+    votingResults.innerHTML = "";
+    votingStatus.textContent = "Выберите кандидатов из занятых активных слотов.";
+    votingFinishButton.hidden = false;
+    votingFinishButton.textContent = "Начать голосование";
+    votingFinishButton.disabled = localVotingCandidates.size < 2;
+    votingResetButton.hidden = false;
+    votingResetButton.textContent = "Отмена";
+    stopVotingCountdown();
+    updateVotingTimerText(30);
+    return;
+  }
+
+  votingSetup.innerHTML = "";
+
+  if (!votingState) {
+    votingStatus.textContent = "Голосование не активно.";
+    votingList.innerHTML = "";
+    votingParticipants.innerHTML = "";
+    votingResults.hidden = true;
+    votingResults.innerHTML = "";
+    votingFinishButton.hidden = true;
+    votingResetButton.hidden = true;
+    stopVotingCountdown();
+    updateVotingTimerText(30);
+    return;
+  }
+
+  const isActive = Boolean(votingState.active);
+  const hasVoted = votingState.voted?.includes(Number(currentPlayerNumber));
+  const participantNumbers = new Set((votingState.participants || []).map((player) => Number(player.number)));
+  const canVote = isActive && participantNumbers.has(Number(currentPlayerNumber)) && !hasVoted;
+
+  votingStatus.textContent = getVotingStatusText(hasVoted);
+  votingList.innerHTML = renderVotingCandidateList(canVote, hasVoted);
+  votingParticipants.innerHTML = renderVotingParticipants();
+
+  if (votingState.result) {
     votingResults.hidden = false;
-    votingResults.innerHTML = renderVotingResults(votingResult);
+    votingResults.innerHTML = renderVotingResults(votingState.result);
   } else {
     votingResults.hidden = true;
     votingResults.innerHTML = "";
   }
 
-  votingFinishButton.disabled = targets.length < 2;
+  votingFinishButton.hidden = isActive || !isHostView();
+  votingFinishButton.textContent = "Новое голосование";
+  votingFinishButton.disabled = false;
+  votingResetButton.hidden = !isHostView() || !isActive;
+  votingResetButton.textContent = "Пропустить голосование";
+  votingResetButton.disabled = false;
+
+  if (isActive) {
+    startVotingCountdown();
+  } else {
+    stopVotingCountdown();
+    updateVotingTimerText(0);
+  }
 }
 
-function renderVotingRow(player, targets) {
-  const isExcluded = excludedPlayers.has(player.number);
-  const selectedTarget = votingVotes[player.number] || "";
-  const options = [
-    `<option value="">Не голосовал</option>`,
-    ...targets
-      .filter((target) => target.number !== player.number)
-      .map((target) => {
-        const selected = Number(selectedTarget) === target.number ? "selected" : "";
-        return `<option value="${target.number}" ${selected}>Игрок ${target.number}</option>`;
-      })
-  ].join("");
-
-  return `
-    <label class="voting-row${isExcluded ? " excluded" : ""}">
-      <span>${escapeHtml(getVotingPlayerLabel(player.number))}${isExcluded ? " · исключен" : ""}</span>
-      <select data-vote-player="${player.number}" ${isExcluded ? "disabled" : ""}>
-        ${options}
-      </select>
-    </label>
+function renderVotingSetup() {
+  const activePlayers = getActiveVotingPlayers();
+  votingSetup.innerHTML = `
+    <div class="voting-setup-grid">
+      ${activePlayers.map((player) => `
+        <label class="voting-candidate-toggle">
+          <input type="checkbox" data-voting-candidate="${player.number}" ${localVotingCandidates.has(player.number) ? "checked" : ""}>
+          <span>
+            <strong>Игрок ${player.number}</strong>
+            <small>${escapeHtml(getVotingPlayerLabel(player.number))}</small>
+          </span>
+        </label>
+      `).join("") || `<div class="voting-empty">Нет занятых активных слотов.</div>`}
+    </div>
   `;
 }
 
-function finishVoting() {
-  if (!votingIsActive || !currentPack?.players?.length) {
+function getVotingStatusText(hasVoted) {
+  if (!votingState) {
+    return "Голосование не активно.";
+  }
+
+  if (votingState.active) {
+    const votedCount = votingState.voted?.length || 0;
+    const total = votingState.participants?.length || 0;
+    return hasVoted
+      ? `Голос принят. Проголосовали ${votedCount} из ${total}.`
+      : `Раунд ${votingState.round}. Проголосовали ${votedCount} из ${total}.`;
+  }
+
+  return votingState.result?.message || votingState.message || "Голосование завершено.";
+}
+
+function renderVotingCandidateList(canVote, hasVoted) {
+  const candidates = votingState?.candidates || [];
+  return candidates.map((candidate) => `
+    <article class="voting-candidate-card">
+      <div>
+        <strong>Игрок ${candidate.number}</strong>
+        <span>${escapeHtml(getVotingPlayerLabel(candidate.number) || candidate.name || `Игрок ${candidate.number}`)}</span>
+      </div>
+      <button class="secondary-button voting-vote-button" type="button" data-vote-candidate="${candidate.number}" ${!canVote ? "disabled" : ""}>
+        ${hasVoted ? "Голос отправлен" : "Голосовать"}
+      </button>
+    </article>
+  `).join("");
+}
+
+function renderVotingParticipants() {
+  const voted = new Set(votingState?.voted || []);
+  const participants = votingState?.participants || [];
+  return `
+    <span>Участники</span>
+    <div>
+      ${participants.map((player) => `
+        <strong class="${voted.has(Number(player.number)) ? "voted" : ""}">
+          Игрок ${player.number}${voted.has(Number(player.number)) ? " ✓" : ""}
+        </strong>
+      `).join("")}
+    </div>
+  `;
+}
+
+function startVotingFromSetup() {
+  if (!isHostView() || !isOnlineRoom()) {
     return;
   }
 
-  votingResult = calculateVotingResult();
-  votingIsActive = false;
-  addGameLog(formatVotingSummaryLog(votingResult));
-  addGameLog(formatVotingWinnerLog(votingResult));
-  renderVotingModal();
-  renderGameLog();
-  syncHostState();
-}
+  const candidates = Array.from(localVotingCandidates);
+  if (candidates.length < 2) {
+    setStatus("Выберите минимум двух кандидатов.", "error");
+    return;
+  }
 
-function calculateVotingResult() {
-  const candidates = getVotingEligiblePlayers();
-  const counts = candidates.reduce((result, player) => {
-    result[player.number] = 0;
-    return result;
-  }, {});
-
-  Object.values(votingVotes).forEach((targetNumber) => {
-    const number = Number(targetNumber);
-    if (counts[number] !== undefined) {
-      counts[number] += 1;
+  socket.emit("voting-start", { roomCode: currentRoomCode, candidates }, (response) => {
+    if (!response?.ok) {
+      setStatus(response?.error || "Не удалось начать голосование.", "error");
+      return;
     }
+
+    votingSetupOpen = false;
+    setStatus("Голосование началось.", "success");
   });
-
-  const maxVotes = Math.max(0, ...Object.values(counts));
-  const winners = Object.entries(counts)
-    .filter(([, count]) => count === maxVotes && maxVotes > 0)
-    .map(([playerNumber]) => Number(playerNumber));
-
-  return { counts, maxVotes, winners };
 }
 
 function renderVotingResults(result) {
-  const rows = Object.entries(result.counts)
+  const rows = Object.entries(result.counts || {})
     .sort(([a], [b]) => Number(a) - Number(b))
     .map(([playerNumber, count]) => {
-      const isWinner = result.winners.includes(Number(playerNumber));
+      const isWinner = Number(result.eliminated) === Number(playerNumber);
       return `
         <div class="voting-result-row${isWinner ? " winner" : ""}">
           <span>Игрок ${playerNumber}</span>
@@ -2777,37 +2911,86 @@ function renderVotingResults(result) {
     })
     .join("");
 
-  const winnerText = result.winners.length
-    ? `Больше всего голосов: ${result.winners.map((number) => `Игрок ${number}`).join(", ")}`
-    : "Голоса не поданы";
-
   return `
-    <div class="voting-result-title">${escapeHtml(winnerText)}</div>
+    <div class="voting-result-title">${escapeHtml(result.message || "Голосование завершено")}</div>
     ${rows}
   `;
 }
 
-function formatVotingSummaryLog(result) {
-  const details = Object.entries(result.counts)
-    .sort(([a], [b]) => Number(a) - Number(b))
-    .map(([playerNumber, count]) => `Игрок ${playerNumber}: ${count}`)
-    .join("; ");
-
-  return `Голосование завершено: ${details || "голосов нет"}`;
-}
-
-function formatVotingWinnerLog(result) {
-  if (!result.winners.length) {
-    return "Больше всего голосов: нет";
+function submitVote(candidateNumber) {
+  if (!isOnlineRoom() || !votingState?.active) {
+    return;
   }
 
-  return `Больше всего голосов: ${result.winners.map((number) => `Игрок ${number}`).join(", ")} (${result.maxVotes})`;
+  socket.emit("voting-submit", { roomCode: currentRoomCode, candidate: Number(candidateNumber) }, (response) => {
+    if (!response?.ok) {
+      setStatus(response?.error || "Не удалось отправить голос.", "error");
+    }
+  });
+}
+
+function skipVoting() {
+  if (!isOnlineRoom() || !isHostView()) {
+    return;
+  }
+
+  socket.emit("voting-skip", { roomCode: currentRoomCode }, (response) => {
+    if (!response?.ok) {
+      setStatus(response?.error || "Не удалось пропустить голосование.", "error");
+    }
+  });
+}
+
+function renderVotingFromState() {
+  if (!votingState) {
+    if (!votingSetupOpen) {
+      closeVotingModal();
+    }
+    return;
+  }
+
+  if (votingState.active || (votingState.status === "ended" && dismissedVotingId !== votingState.id)) {
+    votingSetupOpen = false;
+    renderVotingModal();
+    votingModal.hidden = false;
+    return;
+  }
+
+  renderVotingModal();
+}
+
+function updateVotingTimerText(seconds) {
+  if (votingTimer) {
+    votingTimer.textContent = String(Math.max(0, Math.ceil(seconds)));
+  }
+}
+
+function startVotingCountdown() {
+  stopVotingCountdown();
+  const tick = () => {
+    const remaining = votingState?.endsAt ? (Number(votingState.endsAt) - Date.now()) / 1000 : 0;
+    updateVotingTimerText(remaining);
+  };
+  tick();
+  votingCountdownTimer = window.setInterval(tick, 250);
+}
+
+function stopVotingCountdown() {
+  if (votingCountdownTimer) {
+    window.clearInterval(votingCountdownTimer);
+    votingCountdownTimer = null;
+  }
 }
 
 function closeVotingModal() {
   if (votingModal) {
     votingModal.hidden = true;
   }
+  if (votingState?.status === "ended") {
+    dismissedVotingId = votingState.id;
+  }
+  votingSetupOpen = false;
+  stopVotingCountdown();
 }
 
 function handleSurvivalCalculation() {
@@ -3248,7 +3431,7 @@ helpModal?.addEventListener("click", (event) => {
 settingsPanelButton?.addEventListener("click", () => openSetupModal("gameSettingsModal"));
 roomPanelButton?.addEventListener("click", () => openSetupModal("roomSetupModal"));
 rolePanelButton?.addEventListener("click", () => openSetupModal("roleSetupModal"));
-votingButton?.addEventListener("click", () => openVotingModal(true));
+votingButton?.addEventListener("click", () => openVotingModal(false));
 survivalButton?.addEventListener("click", handleSurvivalCalculation);
 setupModals.forEach((modal) => {
   modal.addEventListener("click", (event) => {
@@ -3275,23 +3458,50 @@ confirmModal.addEventListener("click", (event) => {
 });
 
 votingCloseButton?.addEventListener("click", closeVotingModal);
-votingResetButton?.addEventListener("click", () => openVotingModal(true));
-votingFinishButton?.addEventListener("click", finishVoting);
-votingList?.addEventListener("change", (event) => {
-  const select = event.target.closest("select[data-vote-player]");
-
-  if (!select) {
+votingFinishButton?.addEventListener("click", () => {
+  if (votingSetupOpen) {
+    startVotingFromSetup();
     return;
   }
 
-  const voterNumber = Number(select.dataset.votePlayer);
-  const targetNumber = Number(select.value);
-
-  if (targetNumber) {
-    votingVotes[voterNumber] = targetNumber;
-  } else {
-    delete votingVotes[voterNumber];
+  if (votingState?.status === "ended") {
+    openVotingModal(true);
   }
+});
+votingResetButton?.addEventListener("click", () => {
+  if (votingSetupOpen) {
+    closeVotingModal();
+    return;
+  }
+
+  if (votingState?.active) {
+    skipVoting();
+  }
+});
+votingSetup?.addEventListener("change", (event) => {
+  const checkbox = event.target.closest("input[data-voting-candidate]");
+
+  if (!checkbox) {
+    return;
+  }
+
+  const playerNumber = Number(checkbox.dataset.votingCandidate);
+  if (checkbox.checked) {
+    localVotingCandidates.add(playerNumber);
+  } else {
+    localVotingCandidates.delete(playerNumber);
+  }
+
+  renderVotingModal();
+});
+votingList?.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-vote-candidate]");
+
+  if (!button) {
+    return;
+  }
+
+  submitVote(button.dataset.voteCandidate);
 });
 votingModal?.addEventListener("click", (event) => {
   if (event.target === votingModal) {
