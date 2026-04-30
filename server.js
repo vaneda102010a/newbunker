@@ -21,6 +21,121 @@ const STATIC_FILES = {
   "/images/fanta.jpg": "public/images/fanta.jpg"
 };
 const rooms = new Map();
+const lobbies = new Map(); // New lobby system
+
+// ============================================
+// LOBBY SYSTEM
+// ============================================
+
+/**
+ * Lobby structure:
+ * {
+ *   id: string
+ *   roomCode: string (reference to room)
+ *   players: Player[]
+ *   state: "WAITING_LOBBY" | "IN_GAME" | "FINISHED"
+ *   hostId: string (player.id, not socketId)
+ *   turnIndex: number
+ *   currentTurnStartedAt: number (timestamp)
+ * }
+ */
+
+/**
+ * Player structure in lobby:
+ * {
+ *   id: string (persistent UUID)
+ *   socketId: string (changes on reconnect)
+ *   name: string
+ *   isHost: boolean
+ *   isConnected: boolean
+ *   hasRevealedThisTurn: boolean
+ * }
+ */
+
+function createLobbyId() {
+  return `lobby_${generateRoomCode().toLowerCase()}`;
+}
+
+function createPlayerId() {
+  return `player_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createOrGetLobby(roomCode) {
+  let lobby = lobbies.get(roomCode);
+  
+  if (!lobby) {
+    lobby = {
+      id: createLobbyId(),
+      roomCode: roomCode,
+      players: [],
+      state: "WAITING_LOBBY",
+      hostId: null,
+      turnIndex: 0,
+      currentTurnStartedAt: null
+    };
+    lobbies.set(roomCode, lobby);
+  }
+  
+  return lobby;
+}
+
+function getLobbyByRoomCode(roomCode) {
+  return lobbies.get(normalizeRoomCode(roomCode));
+}
+
+function getLobbyPlayer(lobby, playerId) {
+  return lobby?.players?.find(p => p.id === playerId);
+}
+
+function getLobbyPlayerBySocketId(lobby, socketId) {
+  return lobby?.players?.find(p => p.socketId === socketId);
+}
+
+function getCurrentPlayer(lobby) {
+  if (lobby.state !== "IN_GAME" || lobby.players.length === 0) {
+    return null;
+  }
+  return lobby.players[lobby.turnIndex % lobby.players.length];
+}
+
+function serializeLobby(lobby) {
+  const currentPlayer = getCurrentPlayer(lobby);
+  
+  return {
+    id: lobby.id,
+    roomCode: lobby.roomCode,
+    state: lobby.state,
+    hostId: lobby.hostId,
+    turnIndex: lobby.turnIndex,
+    currentTurnStartedAt: lobby.currentTurnStartedAt,
+    currentPlayerId: currentPlayer?.id || null,
+    players: lobby.players.map(p => ({
+      id: p.id,
+      name: p.name,
+      isHost: p.isHost,
+      isConnected: p.isConnected,
+      hasRevealedThisTurn: p.hasRevealedThisTurn
+    }))
+  };
+}
+
+function broadcastLobby(roomCode) {
+  const lobby = getLobbyByRoomCode(roomCode);
+  const room = rooms.get(normalizeRoomCode(roomCode));
+  
+  if (!lobby || !room) {
+    return;
+  }
+
+  const payload = serializeLobby(lobby);
+  
+  room.players.forEach((roomPlayer) => {
+    io.to(roomPlayer.socketId).emit("lobby-state-update", {
+      lobby: payload,
+      publicUrl: PUBLIC_URL
+    });
+  });
+}
 
 app.get(["/", "/index.html"], (req, res) => {
   res.sendFile(path.join(PROJECT_ROOT, "index.html"));
@@ -65,6 +180,256 @@ app.use((req, res) => {
 });
 
 io.on("connection", (socket) => {
+  // ============================================
+  // LOBBY EVENTS
+  // ============================================
+  
+  socket.on("join-lobby", ({ roomCode, playerName } = {}, reply) => {
+    const normalizedCode = normalizeRoomCode(roomCode);
+    const room = rooms.get(normalizedCode);
+    
+    if (!room) {
+      sendReply(reply, { ok: false, error: "Комната не найдена", playerId: null });
+      return;
+    }
+    
+    // Create lobby if it doesn't exist
+    let lobby = getLobbyByRoomCode(normalizedCode);
+    if (!lobby) {
+      lobby = createOrGetLobby(normalizedCode);
+    }
+    
+    const cleanedName = cleanName(playerName) || `Игрок ${lobby.players.length + 1}`;
+    
+    // Create new player for lobby
+    const playerId = createPlayerId();
+    const newPlayer = {
+      id: playerId,
+      socketId: socket.id,
+      name: cleanedName,
+      isHost: lobby.players.length === 0, // First player is host
+      isConnected: true,
+      hasRevealedThisTurn: false
+    };
+    
+    if (newPlayer.isHost) {
+      lobby.hostId = playerId;
+    }
+    
+    lobby.players.push(newPlayer);
+    
+    // Also add to room for socket.io routing
+    socket.join(normalizedCode);
+    
+    console.log(`Player ${cleanedName} (${playerId}) joined lobby ${normalizedCode}`);
+    
+    sendReply(reply, { ok: true, playerId, roomCode: normalizedCode });
+    broadcastLobby(normalizedCode);
+    broadcastRoom(normalizedCode);
+  });
+  
+  socket.on("reconnect-lobby", ({ roomCode, playerId } = {}, reply) => {
+    const normalizedCode = normalizeRoomCode(roomCode);
+    const room = rooms.get(normalizedCode);
+    const lobby = getLobbyByRoomCode(normalizedCode);
+    
+    if (!room || !lobby) {
+      sendReply(reply, { ok: false, error: "Комната или лобби не найдено" });
+      return;
+    }
+    
+    const player = getLobbyPlayer(lobby, playerId);
+    
+    if (!player) {
+      sendReply(reply, { ok: false, error: "Игрок не найден" });
+      return;
+    }
+    
+    // Update player connection
+    player.socketId = socket.id;
+    player.isConnected = true;
+    
+    // Join room socket
+    socket.join(normalizedCode);
+    
+    console.log(`Player ${player.name} (${playerId}) reconnected to lobby ${normalizedCode}`);
+    
+    sendReply(reply, { ok: true, playerId });
+    broadcastLobby(normalizedCode);
+    broadcastRoom(normalizedCode);
+  });
+  
+  socket.on("start-game", ({ roomCode } = {}, reply) => {
+    const normalizedCode = normalizeRoomCode(roomCode);
+    const lobby = getLobbyByRoomCode(normalizedCode);
+    
+    if (!lobby) {
+      sendReply(reply, { ok: false, error: "Лобби не найдено" });
+      return;
+    }
+    
+    const player = getLobbyPlayerBySocketId(lobby, socket.id);
+    
+    if (!player || !player.isHost) {
+      sendReply(reply, { ok: false, error: "Только хост может начать игру" });
+      return;
+    }
+    
+    if (lobby.players.length < 2) {
+      sendReply(reply, { ok: false, error: "Нужно минимум 2 игрока" });
+      return;
+    }
+    
+    // Start game
+    lobby.state = "IN_GAME";
+    lobby.turnIndex = 0;
+    lobby.currentTurnStartedAt = Date.now();
+    
+    // Reset turn flags
+    lobby.players.forEach(p => {
+      p.hasRevealedThisTurn = false;
+    });
+    
+    console.log(`Game started in lobby ${normalizedCode}`);
+    
+    sendReply(reply, { ok: true });
+    broadcastLobby(normalizedCode);
+  });
+  
+  socket.on("kick-player", ({ roomCode, playerId } = {}, reply) => {
+    const normalizedCode = normalizeRoomCode(roomCode);
+    const lobby = getLobbyByRoomCode(normalizedCode);
+    
+    if (!lobby) {
+      sendReply(reply, { ok: false, error: "Лобби не найдено" });
+      return;
+    }
+    
+    const hostPlayer = getLobbyPlayerBySocketId(lobby, socket.id);
+    
+    if (!hostPlayer || !hostPlayer.isHost) {
+      sendReply(reply, { ok: false, error: "Только хост может исключать игроков" });
+      return;
+    }
+    
+    const playerToKick = getLobbyPlayer(lobby, playerId);
+    
+    if (!playerToKick) {
+      sendReply(reply, { ok: false, error: "Игрок не найден" });
+      return;
+    }
+    
+    // Remove player from lobby
+    lobby.players = lobby.players.filter(p => p.id !== playerId);
+    
+    console.log(`Player ${playerToKick.name} (${playerId}) was kicked from lobby ${normalizedCode}`);
+    
+    sendReply(reply, { ok: true });
+    broadcastLobby(normalizedCode);
+  });
+  
+  socket.on("reveal-characteristic", ({ roomCode, characteristicKey } = {}, reply) => {
+    const normalizedCode = normalizeRoomCode(roomCode);
+    const lobby = getLobbyByRoomCode(normalizedCode);
+    
+    if (!lobby) {
+      sendReply(reply, { ok: false, error: "Лобби не найдено" });
+      return;
+    }
+    
+    if (lobby.state !== "IN_GAME") {
+      sendReply(reply, { ok: false, error: "Игра не начата" });
+      return;
+    }
+    
+    const player = getLobbyPlayerBySocketId(lobby, socket.id);
+    const currentPlayer = getCurrentPlayer(lobby);
+    
+    if (!player) {
+      sendReply(reply, { ok: false, error: "Игрок не найден" });
+      return;
+    }
+    
+    if (!currentPlayer) {
+      sendReply(reply, { ok: false, error: "Текущий игрок не определен" });
+      return;
+    }
+    
+    // Only current player can reveal
+    if (player.id !== currentPlayer.id) {
+      sendReply(reply, { ok: false, error: "Это не ваша очередь" });
+      return;
+    }
+    
+    // Check if already revealed this turn
+    if (player.hasRevealedThisTurn) {
+      sendReply(reply, { ok: false, error: "Вы уже открыли характеристику в этом ходе" });
+      return;
+    }
+    
+    // Mark as revealed
+    player.hasRevealedThisTurn = true;
+    
+    console.log(`Player ${player.name} revealed characteristic: ${characteristicKey}`);
+    
+    sendReply(reply, { ok: true });
+    broadcastLobby(normalizedCode);
+  });
+  
+  socket.on("end-turn", ({ roomCode } = {}, reply) => {
+    const normalizedCode = normalizeRoomCode(roomCode);
+    const lobby = getLobbyByRoomCode(normalizedCode);
+    
+    if (!lobby) {
+      sendReply(reply, { ok: false, error: "Лобби не найдено" });
+      return;
+    }
+    
+    if (lobby.state !== "IN_GAME") {
+      sendReply(reply, { ok: false, error: "Игра не начата" });
+      return;
+    }
+    
+    const player = getLobbyPlayerBySocketId(lobby, socket.id);
+    const currentPlayer = getCurrentPlayer(lobby);
+    
+    if (!player) {
+      sendReply(reply, { ok: false, error: "Игрок не найден" });
+      return;
+    }
+    
+    if (!currentPlayer) {
+      sendReply(reply, { ok: false, error: "Текущий игрок не определен" });
+      return;
+    }
+    
+    // Only current player or host can end turn
+    if (player.id !== currentPlayer.id && !player.isHost) {
+      sendReply(reply, { ok: false, error: "Это не ваша очередь" });
+      return;
+    }
+    
+    // Reset turn flag
+    currentPlayer.hasRevealedThisTurn = false;
+    
+    // Move to next player
+    lobby.turnIndex++;
+    if (lobby.turnIndex >= lobby.players.length) {
+      lobby.turnIndex = 0;
+    }
+    
+    lobby.currentTurnStartedAt = Date.now();
+    
+    console.log(`Turn ended in lobby ${normalizedCode}. Next player: ${lobby.players[lobby.turnIndex]?.name}`);
+    
+    sendReply(reply, { ok: true });
+    broadcastLobby(normalizedCode);
+  });
+  
+  // ============================================
+  // LEGACY ROOM EVENTS
+  // ============================================
+  
   socket.on("createRoom", ({ playerName } = {}, reply) => {
     console.log("Received createRoom");
     createRoomForSocket(socket, playerName, reply);
@@ -90,20 +455,36 @@ io.on("connection", (socket) => {
       socket.join(normalizedCode);
       sendReply(reply, { ok: true, roomCode: normalizedCode });
       broadcastRoom(normalizedCode);
+      broadcastLobby(normalizedCode);
       return;
     }
 
+    const playerName = cleanName(name) || `Игрок ${room.players.length + 1}`;
     room.players.push({
       socketId: socket.id,
-      name: cleanName(name) || `Игрок ${room.players.length + 1}`,
+      name: playerName,
       playerNumber: assignPlayerNumber(room),
       isHost: false,
       connected: true
     });
-    room.gameLog.push(`${room.players[room.players.length - 1].name} присоединился к комнате`);
+    room.gameLog.push(`${playerName} присоединился к комнате`);
+    
+    // Also add to lobby
+    const lobby = createOrGetLobby(normalizedCode);
+    const playerId = createPlayerId();
+    lobby.players.push({
+      id: playerId,
+      socketId: socket.id,
+      name: playerName,
+      isHost: false,
+      isConnected: true,
+      hasRevealedThisTurn: false
+    });
+    
     socket.join(normalizedCode);
     sendReply(reply, { ok: true, roomCode: normalizedCode });
     broadcastRoom(normalizedCode);
+    broadcastLobby(normalizedCode);
   });
 
   socket.on("host-generate-pack", ({ roomCode, pack } = {}) => {
@@ -214,6 +595,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
+    // Clean up room state
     rooms.forEach((room) => {
       const player = room.players.find((candidate) => candidate.socketId === socket.id);
       if (!player) {
@@ -228,6 +610,24 @@ io.on("connection", (socket) => {
       }
       broadcastRoom(room.roomCode);
     });
+    
+    // Clean up lobby state
+    lobbies.forEach((lobby) => {
+      const player = lobby.players.find((candidate) => candidate.socketId === socket.id);
+      if (!player) {
+        return;
+      }
+      
+      player.isConnected = false;
+      console.log(`Player ${player.name} (${player.id}) disconnected from lobby ${lobby.roomCode}`);
+      
+      // Broadcast update
+      const normalizedCode = normalizeRoomCode(lobby.roomCode);
+      const room = rooms.get(normalizedCode);
+      if (room) {
+        broadcastLobby(normalizedCode);
+      }
+    });
   });
 });
 
@@ -236,6 +636,20 @@ function createRoomForSocket(socket, rawPlayerName, reply) {
   const playerName = cleanName(rawPlayerName) || "Ведущий";
   const room = createRoom(roomCode, socket.id, playerName);
   rooms.set(roomCode, room);
+  
+  // Create associated lobby
+  const lobby = createOrGetLobby(roomCode);
+  const playerId = createPlayerId();
+  lobby.players.push({
+    id: playerId,
+    socketId: socket.id,
+    name: playerName,
+    isHost: true,
+    isConnected: true,
+    hasRevealedThisTurn: false
+  });
+  lobby.hostId = playerId;
+  
   socket.join(roomCode);
 
   console.log("Room created:", roomCode);
@@ -244,6 +658,7 @@ function createRoomForSocket(socket, rawPlayerName, reply) {
   socket.emit("roomCreated", { roomCode });
   io.to(roomCode).emit("roomStateUpdated", serializeRoom(room));
   broadcastRoom(roomCode);
+  broadcastLobby(roomCode);
 }
 
 function createRoom(roomCode, hostId, hostName) {
