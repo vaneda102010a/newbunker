@@ -41,8 +41,7 @@ const tableTraits = [
   { key: "largeInventory", label: "Крупное" },
   { key: "backpack", label: "Рюкзак" },
   { key: "additionalInfo", label: "Инфо" },
-  { key: "specialAbility", label: "Спец. воз." },
-  { key: "specialAbility2", label: "Спец. воз. 2" }
+  { key: "specialAbility", label: "Спец. воз." }
 ];
 
 const traitIcons = {
@@ -1264,7 +1263,7 @@ function getTableTraitTitle(character, trait) {
 
   if (trait.key === "specialAbility") {
     const abilities = getPlayerAbilities(character);
-    return abilities[0] || "Не указано";
+    return abilities.join(" / ") || "Не указано";
   }
 
   if (trait.key === "specialAbility2") {

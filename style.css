@@ -218,8 +218,8 @@
 }
 
 .players-table {
-  width: max(100%, 1760px);
-  min-width: 1760px;
+  width: max(100%, 1960px);
+  min-width: 1960px;
   table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
@@ -249,7 +249,7 @@
 }
 
 .players-table-age-col {
-  width: 90px;
+  width: 112px;
 }
 
 .players-table-profession-col {
@@ -277,9 +277,8 @@
   width: 205px;
 }
 
-.players-table-specialAbility-col,
-.players-table-specialAbility2-col {
-  width: 220px;
+.players-table-specialAbility-col {
+  width: 280px;
 }
 
 .players-table th,
@@ -287,8 +286,8 @@
   position: relative;
   min-width: 0;
   height: auto;
-  min-height: 58px;
-  padding: 10px 11px;
+  min-height: 46px;
+  padding: 7px 9px;
   border-right: 1px solid rgba(255, 255, 255, 0.055);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   vertical-align: top;
@@ -312,7 +311,7 @@
   top: 0;
   z-index: 3;
   padding-top: 11px;
-  padding-bottom: 11px;
+  padding-bottom: 9px;
   background: rgba(24, 24, 27, 0.96);
   color: rgba(245, 245, 247, 0.72);
   font-size: 11px;
@@ -397,14 +396,14 @@
 
 .players-table-slot {
   display: grid;
-  gap: 6px;
+  gap: 5px;
   min-width: 0;
   overflow: hidden;
 }
 
 .players-table-player-main {
   display: grid;
-  gap: 6px;
+  gap: 5px;
   min-width: 0;
 }
 
@@ -466,7 +465,7 @@
 
 .players-table-cell .trait-value-box {
   display: grid;
-  gap: 5px;
+  gap: 3px;
   min-height: 0;
 }
 
@@ -474,7 +473,7 @@
   position: relative;
   display: block;
   align-items: start;
-  min-height: 22px;
+  min-height: 20px;
   padding-right: 28px;
   overflow: visible;
 }
@@ -525,7 +524,7 @@
   display: grid;
   grid-template-columns: auto;
   justify-content: center;
-  min-height: 28px;
+  min-height: 24px;
   padding-right: 0;
 }
 
@@ -539,13 +538,38 @@
 .players-table-cell .ability-buttons {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 6px;
+  gap: 4px;
 }
 
 .players-table-cell .ability-use-button {
-  min-height: 26px;
+  min-height: 24px;
   padding: 0 6px;
   font-size: 10px;
+}
+
+.players-table-cell .special-abilities-container {
+  gap: 4px;
+}
+
+.players-table-cell .ability-slot {
+  min-height: 24px;
+  padding: 3px 5px;
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.players-table-cell .ability-slot.closed::before {
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.players-table-cell .ability-slot.opened {
+  min-height: 32px;
+}
+
+.players-table-cell .ability-slot.opened::before {
+  font-size: 9px;
+  margin-bottom: 3px;
 }
 
 .players-table-cell .ability-use-button::after {
@@ -775,13 +799,13 @@
   overflow-wrap: break-word;
   word-break: normal;
   display: block;
-  line-height: 1.32;
+  line-height: 1.28;
   white-space: normal;
 }
 
 .players-table-cell .trait-value-stacked {
   display: grid;
-  gap: 2px;
+  gap: 1px;
   -webkit-line-clamp: unset;
   -webkit-box-orient: initial;
 }
@@ -803,7 +827,7 @@
   display: block;
   overflow: visible;
   overflow-wrap: break-word;
-  line-height: 1.2;
+  line-height: 1.18;
   white-space: normal;
 }
 
