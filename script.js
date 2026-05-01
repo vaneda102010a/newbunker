@@ -14,6 +14,30 @@ const themeCardSources = {
   classic: { path: "/api/cards/classic", fileName: "classic/cards.txt", allowFallback: true },
   fantasy: { path: "/api/cards/fantasy", fileName: "fantasy/cards.txt", allowFallback: false }
 };
+const FANTASY_AVATAR_BASE_PATH = "/images/Avatars/";
+const fantasyRaceAvatarFiles = {
+  "Человек": "Human.png",
+  "Эльф": "High elf.png",
+  "Лесной эльф": "Wood elf.png",
+  "Высший эльф": "High elf.png",
+  "Тёмный эльф (дроу)": "Dark elf.png",
+  "Орк": "Orc.png",
+  "Гном": "Gnome.png",
+  "Дворф": "Dwarf.png",
+  "Гоблин": "Goblin.png",
+  "Тролль": "Troll.png",
+  "Драконорожденный": "Dragonborn.png",
+  "Тифлинг": "Tifling.png",
+  "Фея": "Fairy.png",
+  "Аасимар": "Aasimar.png",
+  "Кобольд": "Kobold.png",
+  "Младший Демон": "Lesser demon.png",
+  "Суккуб/Инкуб": "Succubus.png",
+  "Нимфа": "Nymph.png",
+  "Сатир": "Satyr.png",
+  "Гарпия": "Harpy.png",
+  "Ламия": "Lamia.png"
+};
 const characterTraits = [
   { key: "gender", label: "Пол" },
   { key: "bodyType", label: "Тип тела" },
@@ -416,8 +440,21 @@ function canRevealTrait(playerNumber) {
   return isHostView() || isOwnPlayer(playerNumber);
 }
 
-function canUseAbility(playerNumber) {
-  return isOwnPlayer(playerNumber);
+function canUseAbility(playerNumber, abilityIndex = null) {
+  if (!isOwnPlayer(playerNumber)) {
+    return false;
+  }
+
+  if (abilityIndex === null || abilityIndex === undefined || abilityIndex === "") {
+    return true;
+  }
+
+  const normalizedIndex = Number(abilityIndex);
+  if (!Number.isInteger(normalizedIndex)) {
+    return true;
+  }
+
+  return !usedAbilities[getAbilityKey(playerNumber, normalizedIndex)];
 }
 
 function getConfiguredPlayerCount() {
@@ -502,7 +539,7 @@ function updateControlAvailability() {
         const action = btn.dataset.action;
         if (action === 'use-ability') {
           // abilities are allowed even out of turn
-          btn.disabled = false;
+          btn.disabled = !canUseAbility(Number(btn.dataset.player), Number(btn.dataset.abilityIndex));
         } else {
           btn.disabled = !isMyTurn;
         }
@@ -958,7 +995,7 @@ function approveAbilityRequest(request) {
   // Notify server about applied ability so it can broadcast to others
   if (isOnlineRoom() && isHostView() && wasApplied !== false) {
     const actorName = getRoomPlayerForSlot(context.actorNumber)?.name || `Игрок ${context.actorNumber}`;
-    const abilityText = context.analysis?.raw || context.analysis?.text || (context.traitKey || 'способность');
+    const abilityText = context.abilityText || context.analysis?.raw || context.analysis?.text || (context.traitKey || 'способность');
     const targetNumber = context.targetNumber || null;
     const traitKey = context.traitKey || null;
     const newValue = traitKey ? (getPlayerByNumber(targetNumber)?.[traitKey] || null) : null;
@@ -1407,6 +1444,61 @@ function createPlaceholderImage(character) {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
+function getThemeIdFromPack(packOrTheme = currentPack) {
+  if (typeof packOrTheme === "string") {
+    return getThemeById(packOrTheme).id;
+  }
+
+  const themeId = packOrTheme?.settings?.theme
+    || packOrTheme?.themeId
+    || themeSelect?.value
+    || DEFAULT_THEME_ID;
+
+  return getThemeById(themeId).id;
+}
+
+function isFantasyTheme(packOrTheme = currentPack) {
+  return getThemeIdFromPack(packOrTheme) === "fantasy";
+}
+
+function getRaceAvatar(race, packOrTheme = currentPack) {
+  if (!isFantasyTheme(packOrTheme)) {
+    return "";
+  }
+
+  const fileName = fantasyRaceAvatarFiles[cleanText(race, "")];
+  return fileName ? `${FANTASY_AVATAR_BASE_PATH}${encodeURIComponent(fileName)}` : "";
+}
+
+function renderPlayerAvatar(character, variant = "card") {
+  if (!isFantasyPackActive()) {
+    if (variant !== "card") {
+      return "";
+    }
+
+    return `<img class="portrait" src="${createPlaceholderImage(character)}" alt="Игрок ${character.number}">`;
+  }
+
+  const isRacePublic = isTraitRevealed(character.number, "gender");
+  const avatarSrc = isRacePublic ? getRaceAvatar(character.race) : "";
+  const avatarClass = variant === "table"
+    ? "player-avatar player-avatar-table"
+    : "portrait player-avatar player-avatar-card";
+  const altText = isRacePublic
+    ? `Аватар: ${cleanText(character.race, "раса")}`
+    : `Раса Игрока ${character.number} скрыта`;
+  const imageHtml = avatarSrc
+    ? `<img class="player-avatar-image" src="${escapeHtml(avatarSrc)}" alt="${escapeHtml(altText)}" onerror="this.hidden=true;this.nextElementSibling.hidden=false;">`
+    : "";
+
+  return `
+    <div class="${avatarClass}" aria-label="${escapeHtml(altText)}">
+      ${imageHtml}
+      <span class="player-avatar-placeholder" ${avatarSrc ? "hidden" : ""} aria-hidden="true">?</span>
+    </div>
+  `;
+}
+
 function setCharacterView(view) {
   if (![VIEW_CARDS, VIEW_TABLE].includes(view) || characterView === view) {
     updateViewToggle();
@@ -1488,7 +1580,7 @@ function renderCharacters(characters) {
     card.innerHTML = `
       <span class="number-badge">${character.number}</span>
       ${isOwn ? `<span class="own-card-badge">${escapeHtml(getOwnCardBadgeText())}</span>` : ""}
-      <img class="portrait" src="${createPlaceholderImage(character)}" alt="Игрок ${character.number}">
+      ${renderPlayerAvatar(character, "card")}
       <div class="card-body">
         <h3 class="profession">${renderCardTitle(character)}</h3>
         <dl class="stats">
@@ -1658,15 +1750,25 @@ function getTableTraitLabel(trait) {
   return trait.label;
 }
 
+function getTraitDisplayLabel(trait) {
+  if (trait.key === "gender" && isFantasyPackActive()) {
+    return "Пол / Раса";
+  }
+
+  return trait.label;
+}
+
 function renderPlayerTableSlot(character, isExcluded, gameIsOver) {
   const slotPlayer = getRoomPlayerForSlot(character.number);
   const isOwn = isOwnPlayer(character.number);
   const playerName = slotPlayer?.name || (isOwn && currentPlayerName) || `Игрок ${character.number}`;
   const statusClass = isOwn ? "own" : slotPlayer ? "occupied" : "free";
   const statusText = isOwn ? "Мой слот" : slotPlayer ? "Занято" : "Занять слот";
+  const avatarHtml = renderPlayerAvatar(character, "table");
 
   return `
-    <div class="players-table-slot">
+    <div class="players-table-slot${avatarHtml ? " has-avatar" : ""}">
+      ${avatarHtml}
       <div class="players-table-player-main">
         <span class="players-table-player-name">${escapeHtml(playerName)}</span>
         <span class="players-table-slot-status ${statusClass}">${statusText}</span>
@@ -1700,11 +1802,12 @@ function renderCardTitle(character) {
 function renderTraitRow(character, trait) {
   const value = renderTraitValue(character, trait);
   const icon = traitIcons[trait.key] || "•";
+  const label = getTraitDisplayLabel(trait);
   const revealClass = isNewlyRevealedTrait(character.number, trait.key) ? " revealed-now-row" : "";
 
   return `
     <div class="trait-row trait-${trait.key}${revealClass}">
-      <dt><span class="trait-label-icon" aria-hidden="true">${icon}</span><span>${trait.label}</span></dt>
+      <dt><span class="trait-label-icon" aria-hidden="true">${icon}</span><span>${label}</span></dt>
       <dd>${value}</dd>
     </div>
   `;
@@ -1767,7 +1870,7 @@ function renderVisibleTraitValue(character, trait, isPublic, options = {}) {
   } else if (trait.key === "specialAbility2") {
     const second = cleanText(character?.specialAbility2, "");
     value = renderTraitSignal(second ? renderAbilityCard(character.number, second, 1) : `<span class="trait-value">Не указано</span>`, tone);
-  } else if (options.view === VIEW_TABLE && shouldShowFantasyRaceWithGender(character, trait)) {
+  } else if (shouldShowFantasyRaceWithGender(character, trait)) {
     value = renderTraitSignal(renderFantasyRaceGenderValue(character), tone);
   } else {
     value = renderTraitSignal(`<span class="trait-value">${escapeHtml(character[trait.key])}</span>`, tone);
@@ -1808,8 +1911,7 @@ function renderVisibilityBadge(playerNumber, isPublic) {
 }
 
 function isFantasyPackActive() {
-  const themeId = currentPack?.settings?.theme || currentPack?.themeId || themeSelect?.value || DEFAULT_THEME_ID;
-  return getThemeById(themeId).id === "fantasy";
+  return isFantasyTheme(currentPack);
 }
 
 function getFantasyRaceGenderLines(character) {
@@ -1889,16 +1991,13 @@ function normalizeTraitText(value) {
 }
 
 function renderSpecialAbilities(character) {
-  const abilities = getPlayerAbilities(character);
+  const [slot0, slot1] = getPlayerAbilitySlots(character);
 
-  if (abilities.length === 0) {
+  if (!slot0 && !slot1) {
     return `<span class="trait-value">Не указано</span>`;
   }
 
   // Ensure we always render two slots (top and bottom).
-  const slot0 = abilities[0] || "";
-  const slot1 = abilities[1] || "";
-
   const used0 = Boolean(usedAbilities[`${character.number}:0`]);
   const used1 = Boolean(usedAbilities[`${character.number}:1`]);
 
@@ -1926,7 +2025,7 @@ function renderAbilityCard(playerNumber, ability, abilityIndex) {
   const isUsed = Boolean(usedAbilities[abilityKey]);
   const presentation = getAbilityPresentation(ability);
   const tooltip = escapeHtml(ability);
-  const isDisabled = isUsed || !canUseAbility(playerNumber);
+  const isDisabled = isUsed || !canUseAbility(playerNumber, abilityIndex);
 
   return `
     <button class="ability-btn ability-use-button ability-type-${presentation.visualType}${isUsed ? " used" : ""}" type="button" data-action="use-ability" data-player="${playerNumber}" data-ability-index="${abilityIndex}" data-tooltip="${tooltip}" aria-label="${tooltip}" ${isDisabled ? "disabled" : ""}>
@@ -1948,6 +2047,9 @@ function getAbilityPresentation(abilityText) {
     reveal: "👁",
     reroll: "🎲",
     defense: "🛡",
+    heal: "✚",
+    copy: "⧉",
+    polymorph: "✦",
     global: "🌐"
   };
 
@@ -1971,6 +2073,18 @@ function getAbilityShortLabel(lowerText, logicType) {
 
   if (logicType === "defense") {
     return lowerText.includes("избежать") ? "Иммунитет" : "Щит";
+  }
+
+  if (logicType === "heal") {
+    return "Исцелить";
+  }
+
+  if (logicType === "copy") {
+    return `Копия ${getAbilityTraitGenitiveLabel(traitKey)}`;
+  }
+
+  if (logicType === "polymorph") {
+    return lowerText.includes("полиморф") ? "Полиморф" : "Превращение";
   }
 
   if (logicType === "steal") {
@@ -2014,11 +2128,17 @@ function getAbilityShortLabel(lowerText, logicType) {
 
 function getAbilityTraitGenitiveLabel(traitKey) {
   const labels = {
+    gender: "пола/расы",
+    bodyType: "типа тела",
+    trait: "черты",
+    age: "возраста",
     profession: "профессии",
     health: "здоровья",
+    hobby: "хобби",
     phobia: "фобии",
     largeInventory: "инвентаря",
     backpack: "рюкзака",
+    additionalInfo: "информации",
     specialAbility: "способности"
   };
 
@@ -2118,13 +2238,27 @@ function renderTraitRerollAction(playerNumber, traitKey, label) {
   `;
 }
 
+function getFirstNonEmptyAbility(...values) {
+  return values
+    .map((value) => cleanText(value, "").trim())
+    .find(Boolean) || "";
+}
+
+function getPlayerAbilitySlots(player) {
+  const arrayAbilities = Array.isArray(player?.abilities) ? player.abilities : [];
+
+  return [
+    getFirstNonEmptyAbility(player?.specialAbility, player?.ability1, player?.firstAbility, arrayAbilities[0]),
+    getFirstNonEmptyAbility(player?.specialAbility2, player?.ability2, player?.secondAbility, arrayAbilities[1])
+  ];
+}
+
 function getPlayerAbilities(player) {
-  const first = cleanText(player?.specialAbility, "").trim();
-  const second = cleanText(player?.specialAbility2, "").trim();
-  const list = [];
-  if (first) list.push(first);
-  if (second) list.push(second);
-  return list;
+  return getPlayerAbilitySlots(player).filter(Boolean);
+}
+
+function getPlayerAbility(player, abilityIndex) {
+  return getPlayerAbilitySlots(player)[Number(abilityIndex)] || "";
 }
 
 function getAbilityKey(playerNumber, abilityIndex) {
@@ -2158,10 +2292,13 @@ function analyzeAbility(abilityText, actorNumber) {
       type === "steal"
       || type === "swap"
       || type === "reveal"
+      || type === "heal"
+      || type === "copy"
+      || type === "polymorph"
       || (type === "reroll" && explicitTarget)
       || (type === "manual" && explicitTarget)
     );
-  const needsTrait = !revealAll && !traitKey && ["reveal", "reroll", "swap"].includes(type);
+  const needsTrait = !revealAll && !traitKey && ["reveal", "reroll", "swap", "copy"].includes(type);
 
   return {
     type,
@@ -2178,6 +2315,18 @@ function analyzeAbility(abilityText, actorNumber) {
 function detectAbilityType(lowerText) {
   if (includesAny(lowerText, ["защититься", "избежать"])) {
     return "defense";
+  }
+
+  if (includesAny(lowerText, ["исцеление", "исцелить"]) || lowerText.includes("до состояния здоров")) {
+    return "heal";
+  }
+
+  if (includesAny(lowerText, ["скопировать", "копировать"])) {
+    return "copy";
+  }
+
+  if (includesAny(lowerText, ["полиморф", "превращение"])) {
+    return "polymorph";
   }
 
   if (includesAny(lowerText, ["украсть"])) {
@@ -2204,6 +2353,18 @@ function includesAny(text, keywords) {
 }
 
 function inferTraitKey(lowerText) {
+  if (lowerText.includes("рас") || lowerText.includes("пол")) {
+    return "gender";
+  }
+
+  if (lowerText.includes("возраст")) {
+    return "age";
+  }
+
+  if (lowerText.includes("тип") && lowerText.includes("тел")) {
+    return "bodyType";
+  }
+
   if (lowerText.includes("професс")) {
     return "profession";
   }
@@ -2255,6 +2416,9 @@ function getAbilityTitle(type) {
     reveal: "Раскрытие",
     reroll: "Перегенерация",
     defense: "Защита",
+    heal: "Исцеление",
+    copy: "Копирование",
+    polymorph: "Превращение",
     manual: "Способность"
   };
 
@@ -2523,12 +2687,12 @@ function getRemainingPlayers() {
 }
 
 function openAbilityModal(playerNumber, abilityIndex) {
-  if (!canUseAbility(playerNumber)) {
+  if (!canUseAbility(playerNumber, abilityIndex)) {
     return;
   }
 
   const player = getPlayerByNumber(playerNumber);
-  const abilityText = getPlayerAbilities(player)[abilityIndex];
+  const abilityText = getPlayerAbility(player, abilityIndex);
 
   if (!player || !abilityText) {
     return;
@@ -2624,7 +2788,19 @@ function getTraitOptionsForAbility(analysis, targetNumber) {
     return hiddenTraits.length > 0 ? hiddenTraits : characterTraits;
   }
 
-  return characterTraits.filter((trait) => trait.key !== "specialAbility" && cardSections[trait.key]);
+  if (analysis.type === "copy" && targetNumber) {
+    const revealedTraitsForTarget = characterTraits
+      .filter((trait) => trait.key !== "specialAbility" && isTraitRevealed(targetNumber, trait.key));
+    return revealedTraitsForTarget.length > 0
+      ? revealedTraitsForTarget
+      : characterTraits.filter((trait) => trait.key !== "specialAbility");
+  }
+
+  if (analysis.type === "reroll") {
+    return characterTraits.filter((trait) => trait.key !== "specialAbility" && cardSections[trait.key]);
+  }
+
+  return characterTraits.filter((trait) => trait.key !== "specialAbility");
 }
 
 function updateAbilityConfirmState() {
@@ -2669,7 +2845,7 @@ function confirmAbilityUse() {
   };
   const abilityKey = getAbilityKey(context.actorNumber, context.abilityIndex);
 
-  if (!canUseAbility(context.actorNumber)) {
+  if (!canUseAbility(context.actorNumber, context.abilityIndex)) {
     setStatus("Можно использовать только свои способности.", "error");
     closeAbilityModal();
     return;
@@ -2741,6 +2917,24 @@ function executeAbility(context) {
     return true;
   }
 
+  if (context.analysis.type === "heal") {
+    applyHealAbility(context);
+    highlightTraitCell(context.targetNumber || context.actorNumber, "health");
+    return true;
+  }
+
+  if (context.analysis.type === "copy") {
+    applyCopyAbility(context);
+    if (context.traitKey) highlightTraitCell(context.actorNumber, context.traitKey);
+    return true;
+  }
+
+  if (context.analysis.type === "polymorph") {
+    applyPolymorphAbility(context);
+    highlightTraitCell(context.actorNumber, "gender");
+    return true;
+  }
+
   addGameLog(`Способность Игрока ${context.actorNumber} требует ручного применения`);
   return true;
 }
@@ -2772,9 +2966,10 @@ function applySwapAbility(context) {
     return;
   }
 
-  const actorValue = actor[traitKey];
-  actor[traitKey] = target[traitKey];
-  target[traitKey] = actorValue;
+  swapRawTrait(actor, target, traitKey);
+  if (traitKey === "gender" && isFantasyPackActive()) {
+    swapRawTrait(actor, target, "race");
+  }
   refreshDerivedTraitData(actor, traitKey);
   refreshDerivedTraitData(target, traitKey);
   addGameLog(`Игрок ${context.actorNumber} обменялся ${getTraitInstrumental(traitKey)} с Игроком ${context.targetNumber}`);
@@ -2861,6 +3056,73 @@ function applyRerollAbility(context) {
 function applyDefenseAbility(context) {
   protectedPlayers.add(context.actorNumber);
   addGameLog(`Игрок ${context.actorNumber} защитился от следующей способности`);
+}
+
+function applyHealAbility(context) {
+  const target = getPlayerByNumber(context.targetNumber || context.actorNumber);
+
+  if (!target) {
+    addGameLog(`Исцеление Игрока ${context.actorNumber} требует ручного применения`);
+    return;
+  }
+
+  target.health = "Здоров";
+  refreshDerivedTraitData(target, "health");
+  addGameLog(`Игрок ${context.actorNumber} исцелил Игрока ${target.number}`);
+}
+
+function applyCopyAbility(context) {
+  const actor = getPlayerByNumber(context.actorNumber);
+  const target = getPlayerByNumber(context.targetNumber);
+  const traitKey = context.traitKey;
+
+  if (!actor || !target || !traitKey) {
+    addGameLog(`Копирование Игрока ${context.actorNumber} требует ручного применения`);
+    return;
+  }
+
+  if (!isTraitRevealed(target.number, traitKey)) {
+    addGameLog(`Игрок ${context.actorNumber} не смог скопировать закрытую характеристику Игрока ${target.number}`);
+    return;
+  }
+
+  copyTraitValue(actor, target, traitKey);
+  refreshDerivedTraitData(actor, traitKey);
+  addGameLog(`Игрок ${context.actorNumber} скопировал ${getTraitAccusative(traitKey)} Игрока ${target.number}`);
+}
+
+function applyPolymorphAbility(context) {
+  const actor = getPlayerByNumber(context.actorNumber);
+  const target = getPlayerByNumber(context.targetNumber);
+
+  if (!actor || !target) {
+    addGameLog(`Превращение Игрока ${context.actorNumber} требует ручного применения`);
+    return;
+  }
+
+  const lowerText = cleanText(context.abilityText, "").toLowerCase();
+  const traitKeys = lowerText.includes("полиморф")
+    ? ["race", "gender", "age", "bodyType"]
+    : ["race", "gender"];
+
+  traitKeys.forEach((traitKey) => swapRawTrait(actor, target, traitKey));
+  refreshDerivedTraitData(actor, "health");
+  refreshDerivedTraitData(target, "health");
+  addGameLog(`Игрок ${context.actorNumber} применил превращение к Игроку ${target.number}`);
+}
+
+function copyTraitValue(actor, target, traitKey) {
+  actor[traitKey] = target[traitKey];
+
+  if (traitKey === "gender" && isFantasyPackActive()) {
+    actor.race = target.race;
+  }
+}
+
+function swapRawTrait(actor, target, traitKey) {
+  const actorValue = actor[traitKey];
+  actor[traitKey] = target[traitKey];
+  target[traitKey] = actorValue;
 }
 
 function mergeStolenItem(currentValue, stolenValue) {
