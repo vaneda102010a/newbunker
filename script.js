@@ -1493,7 +1493,22 @@ function renderCharacters(characters) {
 
 function renderPlayersTable(characters) {
   const gameIsOver = isGameOver();
-  const visibleTableTraits = tableTraits.filter((trait) => trait.key !== "specialAbility2");
+  const themeId = currentPack?.settings?.theme || currentPack?.themeId || themeSelect?.value || DEFAULT_THEME_ID;
+  const isClassicTheme = getThemeById(themeId).id === "classic";
+
+  // Build visible table traits; for Classic theme merge Gender + Age into a single column
+  const visibleTableTraits = [];
+  for (const trait of tableTraits) {
+    if (trait.key === "specialAbility2") continue;
+    if (isClassicTheme && trait.key === "gender") {
+      visibleTableTraits.push({ key: "gender_age", label: "Пол / Возраст" });
+      continue;
+    }
+    if (isClassicTheme && trait.key === "age") {
+      continue;
+    }
+    visibleTableTraits.push(trait);
+  }
   const table = document.createElement("div");
   table.className = "players-table-wrap table-container";
   table.innerHTML = `
@@ -1527,11 +1542,24 @@ function renderPlayerTableRow(character, gameIsOver, visibleTableTraits = tableT
   return `
     <tr class="${isExcluded ? "excluded" : ""}${isOwn ? " own-row" : ""}" style="--accent: ${character.accent}" data-player="${character.number}">
       <td class="players-table-player" title="${escapeHtml(playerTitle)}">${renderPlayerTableSlot(character, isExcluded, gameIsOver)}</td>
-      ${visibleTableTraits.map((trait, columnIndex) => `
-        <td class="players-table-cell trait-${trait.key}${isNewlyRevealedTrait(character.number, trait.key) ? " revealed-now-cell" : ""}" data-column="${columnIndex + 1}" title="${escapeHtml(getTableTraitTitle(character, trait))}">
-          ${renderTraitValue(character, trait, { view: VIEW_TABLE })}
-        </td>
-      `).join("")}
+      ${visibleTableTraits.map((trait, columnIndex) => {
+        if (trait.key === "gender_age") {
+          const gender = cleanText(character.gender, "Не указано");
+          const age = cleanText(character.age, "Не указано");
+          const combined = `${gender}, ${age}`;
+          return `
+            <td class="players-table-cell trait-gender_age${isNewlyRevealedTrait(character.number, 'gender') || isNewlyRevealedTrait(character.number, 'age') ? " revealed-now-cell" : ""}" data-column="${columnIndex + 1}" title="${escapeHtml(combined)}">
+              ${renderTraitSignal(`<span class="trait-value">${escapeHtml(combined)}</span>`, getTraitTone(character, { key: 'age' }))}
+            </td>
+          `;
+        }
+
+        return `
+          <td class="players-table-cell trait-${trait.key}${isNewlyRevealedTrait(character.number, trait.key) ? " revealed-now-cell" : ""}" data-column="${columnIndex + 1}" title="${escapeHtml(getTableTraitTitle(character, trait))}">
+            ${renderTraitValue(character, trait, { view: VIEW_TABLE })}
+          </td>
+        `;
+      }).join("")}
     </tr>
   `;
 }
@@ -1542,6 +1570,15 @@ function getTablePlayerTitle(character) {
 }
 
 function getTableTraitTitle(character, trait) {
+  if (trait.key === "gender_age") {
+    const genderVisible = canViewTrait(character.number, 'gender');
+    const ageVisible = canViewTrait(character.number, 'age');
+    if (!genderVisible && !ageVisible) return "🔒";
+    const gender = genderVisible ? cleanText(character.gender, "Не указано") : "🔒";
+    const age = ageVisible ? cleanText(character.age, "Не указано") : "🔒";
+    return `${gender}, ${age}`;
+  }
+
   if (!canViewTrait(character.number, trait.key)) {
     return "🔒";
   }
@@ -1566,6 +1603,10 @@ function getTableTraitTitle(character, trait) {
 function getTableTraitLabel(trait) {
   if (trait.key === "gender" && isFantasyPackActive()) {
     return "Пол / Раса";
+  }
+
+  if (trait.key === "gender_age") {
+    return "Пол / Возраст";
   }
 
   return trait.label;

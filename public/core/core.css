@@ -883,8 +883,6 @@ th, td {
 
 /* Allow manual horizontal resize of table columns in supporting browsers */
 th {
-  resize: horizontal;
-  overflow: auto;
   min-width: 100px;
 }
 
@@ -901,7 +899,15 @@ table tbody tr:nth-child(even) {
 
 table tbody tr:hover {
   /* hover highlight intentionally disabled for turn-based UI */
-  /* background: rgba(138, 43, 226, 0.2); */
+}
+
+/* Sticky first column (player/index) to keep it visible while scrolling horizontally */
+.players-table th:first-child,
+.players-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  background: var(--surface);
 }
 
 /* Highlight for last changed cell */
