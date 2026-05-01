@@ -1565,8 +1565,8 @@ function renderPlayerTableRow(character, gameIsOver, visibleTableTraits = tableT
       <td class="players-table-player" title="${escapeHtml(playerTitle)}">${renderPlayerTableSlot(character, isExcluded, gameIsOver)}</td>
       ${visibleTableTraits.map((trait, columnIndex) => {
         if (trait.key === "gender_age") {
-          const gender = cleanText(character.gender, "Не указано");
-          const age = cleanText(character.age, "Не указано");
+          const gender = cleanText(character.gender, "--");
+          const age = cleanText(character.age, "--");
           const combined = `${gender}, ${age}`;
           return `
             <td class="players-table-cell trait-gender_age${isNewlyRevealedTrait(character.number, 'gender') || isNewlyRevealedTrait(character.number, 'age') ? " revealed-now-cell" : ""}" data-column="${columnIndex + 1}" title="${escapeHtml(combined)}">
@@ -1595,8 +1595,8 @@ function getTableTraitTitle(character, trait) {
     const genderVisible = canViewTrait(character.number, 'gender');
     const ageVisible = canViewTrait(character.number, 'age');
     if (!genderVisible && !ageVisible) return "🔒";
-    const gender = genderVisible ? cleanText(character.gender, "Не указано") : "🔒";
-    const age = ageVisible ? cleanText(character.age, "Не указано") : "🔒";
+    const gender = genderVisible ? cleanText(character.gender, "--") : "--";
+    const age = ageVisible ? cleanText(character.age, "--") : "--";
     return `${gender}, ${age}`;
   }
 
