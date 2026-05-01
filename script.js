@@ -1179,12 +1179,36 @@ function createLocalPack(settings) {
 function createRandomizedBunker(template, availableSlots) {
   const size = randomInt(50, 300);
   const years = randomInt(3, 30);
+  const resources = getBunkerResources(template, years);
 
   return {
     ...template,
+    name: resources.name,
+    description: resources.description,
+    duration: resources.duration,
+    food: resources.food,
+    foodDescription: template.food,
     size: `${size} ${getRussianSquareMeterWord(size)}`,
     stayTime: `${years} ${getRussianYearWord(years)}`,
     availableSlots
+  };
+}
+
+function getBunkerResources(template, duration) {
+  if (typeof window.generateShelterResources === "function") {
+    return window.generateShelterResources({
+      name: template.buildTime || "Бункер",
+      description: template.location || "",
+      minDuration: duration,
+      maxDuration: duration
+    });
+  }
+
+  return {
+    name: template.buildTime || "Бункер",
+    description: template.location || "",
+    duration,
+    food: Math.max(1, Math.min(duration, randomInt(1, duration)))
   };
 }
 
@@ -1428,7 +1452,7 @@ function renderPack(pack) {
 
   catastropheTabTitle.textContent = pack.catastrophe.title;
   catastropheTabText.innerHTML = formatCatastrophe(pack.catastrophe);
-  bunkerTabText.innerHTML = formatBunker(pack.bunker);
+  bunkerTabText.innerHTML = formatBunker(pack.bunker, pack.themeId);
 }
 
 function updateSurvivalButton() {
@@ -2408,17 +2432,45 @@ function rerollTrait(playerNumber, traitKey) {
 
 
 
-function formatBunker(bunker) {
+function formatBunker(bunker, themeId = "classic") {
+  const durationValue = Number(bunker.duration) || 0;
+  const foodValue = Number(bunker.food) || 0;
+  const resourceRatio = durationValue > 0 ? Math.min(100, Math.round((foodValue / durationValue) * 100)) : 0;
+  const lowResourceWarning = durationValue > 0 && foodValue / durationValue < 0.2;
+  const foodDescription = bunker.foodDescription ?? String(bunker.food);
+
+  const resourceSection = themeId === "classic"
+    ? `
+      <div class="bunker-resources bunker-resources--classic">
+        <h4>Ресурсы</h4>
+        <ul class="detail-list">
+          <li><strong>Срок внутри:</strong> ${escapeHtml(String(durationValue))} мес.</li>
+          <li><strong>Еда:</strong> ${escapeHtml(String(foodValue))} мес.</li>
+        </ul>
+      </div>
+    `
+    : `
+      <div class="bunker-resources ${lowResourceWarning ? "low-resource" : ""}">
+        <h4>Ресурсы</h4>
+        <div class="resource-row"><span>Срок внутри:</span> <strong>${escapeHtml(String(durationValue))} мес.</strong></div>
+        <div class="resource-row"><span>Еда:</span> <strong>${escapeHtml(String(foodValue))} / ${escapeHtml(String(durationValue))} мес.</strong></div>
+        <div class="resource-bar">
+          <div class="resource-bar__fill" style="width:${resourceRatio}%;"></div>
+        </div>
+      </div>
+    `;
+
   return `
     <ul class="detail-list">
       <li><strong>Постройка:</strong> ${escapeHtml(bunker.buildTime)}</li>
       <li><strong>Локация:</strong> ${escapeHtml(bunker.location)}</li>
       <li><strong>Размер:</strong> ${escapeHtml(bunker.size)}</li>
       <li><strong>Срок внутри:</strong> ${escapeHtml(bunker.stayTime)}</li>
-      <li><strong>Еда:</strong> ${escapeHtml(bunker.food)}</li>
+      <li><strong>Еда:</strong> ${escapeHtml(foodDescription)}</li>
       <li><strong>Полезные предметы:</strong> ${escapeHtml(bunker.items.join(", "))}</li>
       <li><strong>Мест в бункере:</strong> ${escapeHtml(bunker.availableSlots)}</li>
     </ul>
+    ${resourceSection}
   `;
 }
 

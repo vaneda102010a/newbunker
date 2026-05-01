@@ -184,6 +184,8 @@ export function generateShelterResources(options = {}) {
   const foodSupply = Math.max(1, Math.min(stayDuration, getWeightedRandom(1, stayDuration, 3)));
 
   return {
+    name: String(options.name || options.title || "Бункер"),
+    description: String(options.description || options.descriptionText || ""),
     duration: stayDuration,
     food: foodSupply
   };
@@ -210,10 +212,12 @@ window.HopeThemeEngine = {
   loadTheme,
   setThemeStyle,
   whenThemeReady,
+  generateShelterResources,
   get currentTheme() {
     return currentTheme;
   }
 };
+window.generateShelterResources = generateShelterResources;
 
 setCurrentTheme(fallbackTheme);
 window.dispatchEvent(new CustomEvent("hope:theme-engine-ready", { detail: window.HopeThemeEngine }));

@@ -585,6 +585,61 @@ button:focus-visible {
   color: rgba(245, 245, 247, 0.9);
 }
 
+.bunker-resources {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bunker-resources--classic {
+  background: transparent;
+  border-color: transparent;
+  padding: 0;
+}
+
+.bunker-resources h4 {
+  margin: 0;
+  color: rgba(245, 245, 247, 0.95);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.resource-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(245, 245, 247, 0.8);
+  font-size: 14px;
+}
+
+.resource-bar {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.resource-bar__fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, #47c37d 0%, #76e6b8 100%);
+  transition: width 0.25s ease;
+}
+
+.bunker-resources.low-resource {
+  border-color: rgba(255, 120, 40, 0.5);
+  background: rgba(255, 120, 40, 0.1);
+}
+
+.bunker-resources.low-resource .resource-bar__fill {
+  background: linear-gradient(90deg, #ff8c42 0%, #ffcf7c 100%);
+}
+
 .game-log-panel {
   display: grid;
   grid-template-columns: 1fr;
@@ -755,7 +810,7 @@ button:focus-visible {
 }
 
 .players-table col.players-table-gender_age-col {
-  width: 80px;
+  width: 100px;
 }
 
 .setup-modal-backdrop {
