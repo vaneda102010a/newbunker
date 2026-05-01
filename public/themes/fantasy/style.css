@@ -120,9 +120,7 @@ body.theme-fantasy::before {
   background: rgba(255, 255, 255, 0.03);
 }
 
-.theme-fantasy .players-table tbody tr:hover {
-  background: linear-gradient(90deg, rgba(160, 100, 255, 0.18), transparent 54%), rgba(22, 24, 58, 0.78);
-}
+/* Removed fantasy theme table row :hover to disable hover highlight */
 
 .theme-fantasy td,
 .theme-fantasy .players-table th,
@@ -137,11 +135,7 @@ body.theme-fantasy::before {
   background: rgba(10, 12, 30, 0.48);
 }
 
-.theme-fantasy .players-table tbody tr:hover {
-  background:
-    linear-gradient(90deg, rgba(120, 80, 255, 0.18), transparent 54%),
-    rgba(22, 24, 58, 0.68);
-}
+/* Removed duplicate fantasy table :hover rule to disable hover highlight */
 
 .theme-fantasy button {
   background: linear-gradient(135deg, #243bff, #8b3dff);

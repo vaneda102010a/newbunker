@@ -3575,47 +3575,7 @@ function closeActiveAbilityTooltips(exceptButton = null) {
   });
 }
 
-function clearPlayersTableHover(table) {
-  table?.querySelectorAll(".row-hover, .column-hover").forEach((element) => {
-    element.classList.remove("row-hover", "column-hover");
-  });
-}
-
-function applyPlayersTableHover(cell) {
-  const table = cell.closest(".players-table");
-  const row = cell.closest("tr");
-
-  if (!table || !row) {
-    return;
-  }
-
-  clearPlayersTableHover(table);
-  row.classList.add("row-hover");
-  table.querySelectorAll(`tr > *:nth-child(${cell.cellIndex + 1})`).forEach((columnCell) => {
-    columnCell.classList.add("column-hover");
-  });
-}
-
-function handlePlayersTablePointerOver(event) {
-  const cell = event.target.closest(".players-table th, .players-table td");
-
-  if (!cell || !characterGrid.contains(cell)) {
-    return;
-  }
-
-  applyPlayersTableHover(cell);
-}
-
-function handlePlayersTablePointerOut(event) {
-  const table = event.target.closest?.(".players-table");
-
-  if (table && !table.contains(event.relatedTarget)) {
-    clearPlayersTableHover(table);
-  }
-}
-
-characterGrid.addEventListener("pointerover", handlePlayersTablePointerOver);
-characterGrid.addEventListener("pointerout", handlePlayersTablePointerOut);
+/* Table hover handlers removed to disable row/column hover highlighting */
 
 characterGrid.addEventListener("click", (event) => {
   const button = event.target.closest("button");
