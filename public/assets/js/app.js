@@ -1088,9 +1088,7 @@ characterGrid.addEventListener("click", (event) => {
     rerollTrait(playerNumber, button.dataset.trait);
   }
 
-  if (button.dataset.action === "make-healthy") {
-    makePlayerHealthy(playerNumber);
-  }
+  
 
   if (button.dataset.action === "reveal-all") {
     if (!isHostView()) {

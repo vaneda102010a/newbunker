@@ -902,12 +902,13 @@ table tbody tr:hover {
 }
 
 /* Sticky first column (player/index) to keep it visible while scrolling horizontally */
-.players-table th:first-child,
-.players-table td:first-child {
+table th:first-child,
+table td:first-child {
   position: sticky;
   left: 0;
-  z-index: 10;
-  background: var(--surface);
+  z-index: 5;
+  background-color: #1a1a2e;
+  border-right: 2px solid rgba(255, 255, 255, 0.1);
 }
 
 /* Highlight for last changed cell */

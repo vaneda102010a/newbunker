@@ -1499,7 +1499,7 @@ function renderPlayersTable(characters) {
   // Build visible table traits; for Classic theme merge Gender + Age into a single column
   const visibleTableTraits = [];
   for (const trait of tableTraits) {
-    if (trait.key === "specialAbility2") continue;
+    if (trait.key === "specialAbility" || trait.key === "specialAbility2") continue;
     if (isClassicTheme && trait.key === "gender") {
       visibleTableTraits.push({ key: "gender_age", label: "Пол / Возраст" });
       continue;
@@ -1532,6 +1532,27 @@ function renderPlayersTable(characters) {
   `;
 
   characterGrid.append(table);
+  // Render abilities sub-table below the main players table
+  const abilitiesHtml = `
+    <div class="abilities-table-wrap table-container">
+      <div class="table-wrapper">
+        <table class="abilities-table players-table">
+          <thead>
+            <tr>
+              ${characters.map((ch) => `<th scope="col">${escapeHtml(getTablePlayerTitle(ch))}</th>`).join("")}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              ${characters.map((ch) => `<td class="abilities-cell" data-player="${ch.number}">${renderSpecialAbilities(ch)}</td>`).join("")}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  characterGrid.insertAdjacentHTML("beforeend", abilitiesHtml);
 }
 
 function renderPlayerTableRow(character, gameIsOver, visibleTableTraits = tableTraits) {
@@ -1697,12 +1718,11 @@ function renderHiddenTraitValue(playerNumber, trait) {
 function renderHostHiddenTraitControls(playerNumber, trait) {
   const revealAction = renderTraitRevealAction(playerNumber, trait.key, trait.label);
   const rerollAction = renderTraitRerollAction(playerNumber, trait.key, trait.label);
-  const healthAction = trait.key === "health" ? renderHealthFixAction(playerNumber) : "";
 
   return `
     <div class="trait-value-box hidden-host-controls">
       <div class="trait-value-line">
-        <span class="trait-row-actions">${revealAction}${rerollAction}${healthAction}</span>
+        <span class="trait-row-actions">${revealAction}${rerollAction}</span>
       </div>
     </div>
   `;
@@ -1734,15 +1754,12 @@ function renderVisibleTraitValue(character, trait, isPublic, options = {}) {
   const rerollAction = isHostView()
     ? renderTraitRerollAction(character.number, trait.key, trait.label)
     : "";
-  const healthAction = isHostView() && trait.key === "health"
-    ? renderHealthFixAction(character.number)
-    : "";
 
   return `
     <div class="trait-value-box${revealClass}">
       <div class="trait-value-line">
         ${value}
-        <span class="trait-row-actions">${revealAction}${rerollAction}${healthAction}</span>
+        <span class="trait-row-actions">${revealAction}${rerollAction}</span>
       </div>
       ${renderVisibilityBadge(character.number, isPublic)}
     </div>
@@ -2078,14 +2095,6 @@ function renderTraitRerollAction(playerNumber, traitKey, label) {
   `;
 }
 
-function renderHealthFixAction(playerNumber) {
-  return `
-    <button class="trait-mini-action health-fix-action" type="button" data-action="make-healthy" data-player="${playerNumber}" aria-label="Сделать здоровым" title="Сделать здоровым">
-      ⚕
-    </button>
-  `;
-}
-
 function getPlayerAbilities(player) {
   const first = cleanText(player?.specialAbility, "").trim();
   const second = cleanText(player?.specialAbility2, "").trim();
@@ -2398,29 +2407,7 @@ function rerollTrait(playerNumber, traitKey) {
   setStatus(`Игрок ${player.number}: ${getTraitAccusative(traitKey)} перегенерировано.`, "success");
 }
 
-function makePlayerHealthy(playerNumber) {
-  if (!isHostView()) {
-    return;
-  }
 
-  const player = getPlayerByNumber(playerNumber);
-
-  if (!player) {
-    return;
-  }
-
-  player.health = "Здоров";
-  refreshDerivedTraitData(player, "health");
-  addGameLog(`Ведущий изменил здоровье Игрока ${player.number}`);
-  renderPack(currentPack);
-  renderGameLog();
-
-  if (isOnlineRoom()) {
-    syncHostState();
-  }
-
-  setStatus(`Игрок ${player.number}: здоровье изменено.`, "success");
-}
 
 function formatBunker(bunker) {
   return `
@@ -3661,9 +3648,6 @@ characterGrid.addEventListener("click", (event) => {
     rerollTrait(playerNumber, button.dataset.trait);
   }
 
-  if (button.dataset.action === "make-healthy") {
-    makePlayerHealthy(playerNumber);
-  }
 
   if (button.dataset.action === "reveal-all") {
     if (!isHostView()) {
