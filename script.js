@@ -1160,6 +1160,12 @@ function createLocalPack(settings) {
     players.forEach((p) => {
       p.gender = getThemeGenderByRace(cleanText(p.race || p.gender, ""), p.gender);
     });
+  } else if (themeId === "classic" || !themeId) {
+    // For Classic theme, enforce strict gender selection and avoid malformed entries from cards.txt
+    const classicGenders = ["Мужской", "Женский"];
+    players.forEach((p) => {
+      p.gender = pickRandom(classicGenders);
+    });
   }
 
   return {
@@ -1217,7 +1223,15 @@ function createDrawState() {
 }
 
 function drawCard(section, drawState, excluded = new Set()) {
-  const cards = cardDatabase[section] || [];
+  // sanitize card list: remove empty or whitespace-only entries
+  const rawCards = cardDatabase[section] || [];
+  const cards = rawCards.filter((c) => {
+    try {
+      return String(c).trim().length > 0;
+    } catch (e) {
+      return false;
+    }
+  });
 
   if (cards.length === 0) {
     return "Не указано";
@@ -1935,16 +1949,13 @@ function renderHealthValue(character, tone = "neutral") {
     : "medium";
   const explanation = character.healthExplanation || "Состояние влияет на ресурс организма и шансы выжить.";
 
+  // Render only the health value and marker; remove redundant tooltip/question-mark element.
   return `
     <span class="health-value health-${severity} trait-signal trait-tone-${tone}">
       <span class="health-text">
         <span class="trait-tone-dot health-marker" aria-hidden="true"></span>
         <span class="trait-value">${escapeHtml(character.health)}</span>
       </span>
-      <button class="health-help" type="button" data-action="health-info" aria-label="Пояснение здоровья">
-        ?
-        <span class="health-tooltip" role="tooltip">${escapeHtml(explanation)}</span>
-      </button>
     </span>
   `;
 }
@@ -3613,14 +3624,7 @@ characterGrid.addEventListener("click", (event) => {
     return;
   }
 
-  if (button.dataset.action === "health-info") {
-    const wasActive = button.classList.contains("active");
-    characterGrid.querySelectorAll(".health-help.active").forEach((activeButton) => {
-      activeButton.classList.remove("active");
-    });
-    button.classList.toggle("active", !wasActive);
-    return;
-  }
+  // removed health-info tooltip handling (tooltip element was removed)
 
   const playerNumber = Number(button.dataset.player);
 
