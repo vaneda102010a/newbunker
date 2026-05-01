@@ -489,6 +489,26 @@ function updateControlAvailability() {
   themeSelect.disabled = !isHostView();
   styleSelect.disabled = !isHostView();
   difficultySelect.disabled = !isHostView();
+
+  // When in online room, only allow full interactions for the active player.
+  if (isOnlineRoom()) {
+    const isMyTurn = currentLobby && localPlayerId && currentLobby.players && typeof currentLobby.currentTurnIndex === 'number'
+      ? (currentLobby.players[currentLobby.currentTurnIndex] && currentLobby.players[currentLobby.currentTurnIndex].id === localPlayerId)
+      : false;
+
+    // Disable most action buttons for non-active players, but keep ability buttons enabled.
+    document.querySelectorAll('[data-action]').forEach((btn) => {
+      try {
+        const action = btn.dataset.action;
+        if (action === 'use-ability') {
+          // abilities are allowed even out of turn
+          btn.disabled = false;
+        } else {
+          btn.disabled = !isMyTurn;
+        }
+      } catch (e) {}
+    });
+  }
 }
 
 function initializeSocket() {
@@ -566,28 +586,27 @@ function initializeSocket() {
       }
     } catch (e) {}
   });
-
-  socket.on('kicked', ({ roomCode } = {}) => {
+  // server kick -> clear storage and redirect home
+  socket.on('you_are_kicked', ({ roomCode } = {}) => {
     try {
       isKicked = true;
-      if (roomCode) localStorage.setItem(`bunker_kicked_${roomCode}`, '1');
-      try { localStorage.removeItem(`bunker_player_${roomCode}`); } catch (e) {}
+      if (roomCode) {
+        try { localStorage.setItem(`bunker_kicked_${roomCode}`, '1'); } catch (e) {}
+        try { localStorage.removeItem(`bunker_player_${roomCode}`); } catch (e) {}
+      }
       // stop audio if any
       const audios = document.querySelectorAll('audio');
       audios.forEach(a => { try { a.pause(); a.currentTime = 0; } catch (e) {} });
-      // show modal/fullscreen message
-      const div = document.createElement('div');
-      div.style.position = 'fixed';
-      div.style.inset = '0';
-      div.style.zIndex = '99999';
-      div.style.display = 'grid';
-      div.style.placeItems = 'center';
-      div.style.background = 'rgba(0,0,0,0.85)';
-      div.style.color = '#fff';
-      div.style.fontSize = '20px';
-      div.style.textAlign = 'center';
-      div.innerHTML = `<div style="max-width:600px;padding:24px;border-radius:12px;background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.06)">Вы были исключены из комнаты ведущим.<br><br>Обновите страницу, чтобы попытаться подключиться снова.</div>`;
-      document.body.appendChild(div);
+      // notify and redirect to home
+      alert('Вы были исключены из комнаты ведущим. Вы будете перенаправлены на главную.');
+      window.location.href = '/';
+    } catch (e) {}
+  });
+
+  socket.on('turnChanged', (payload) => {
+    try {
+      // payload contains nextPlayerIndex and nextPlayerId
+      updateControlAvailability();
     } catch (e) {}
   });
   socket.on("disconnect", () => {
@@ -712,7 +731,7 @@ function applyLobbyState(lobby) {
       const isCurrent = lobby.currentPlayerId && lobby.currentPlayerId === p.id;
       let kickButton = "";
       if (localPlayerId && lobby.hostId === localPlayerId && p.id !== localPlayerId) {
-        kickButton = ` <button class="kick-button" data-player-id="${p.id}">Кик</button>`;
+        kickButton = ` <button class="kick-button" data-player-id="${p.id}" data-socket-id="${p.socketId || ''}">Кик</button>`;
       }
 
       return `<li${isCurrent ? ' class="current-turn"' : ''}><span>${name}</span> <strong>${roleLabel}${isCurrent ? ' (Ход)' : ''}</strong>${kickButton}</li>`;
@@ -727,6 +746,8 @@ function applyLobbyState(lobby) {
       startGameButton.hidden = true;
     }
   }
+  // Update controls based on new lobby/turn state
+  updateControlAvailability();
 }
 
 // Notifications (simple toast)
@@ -801,9 +822,12 @@ roomPlayersList?.addEventListener("click", (e) => {
   const btn = e.target.closest(".kick-button");
   if (!btn) return;
   const playerId = btn.getAttribute("data-player-id");
-  if (!playerId || !currentRoomCode) return;
+  const targetSocketId = btn.getAttribute("data-socket-id");
+  if ((!playerId && !targetSocketId) || !currentRoomCode) return;
   if (!confirm("Исключить этого игрока?")) return;
-  socket.emit("kickPlayer", { roomCode: currentRoomCode, playerId }, (res) => {
+  // Prefer kicking by socketId when available (admin API expects targetSocketId)
+  const payload = targetSocketId ? { roomCode: currentRoomCode, targetSocketId } : { roomCode: currentRoomCode, playerId };
+  socket.emit("kickPlayer", payload, (res) => {
     if (!res?.ok) {
       alert(res?.error || "Не удалось кикнуть игрока");
     }
@@ -2177,7 +2201,7 @@ function markNewlyRevealedTraits(nextRevealedTraits) {
 
 function revealTrait(playerNumber, traitKey) {
   if (isOnlineRoom()) {
-    socket.emit("reveal-trait", { roomCode: currentRoomCode, playerNumber, traitKey });
+    socket.emit("actionPerformed", { roomCode: currentRoomCode, action: { type: 'reveal', playerNumber, traitKey } });
     return;
   }
 

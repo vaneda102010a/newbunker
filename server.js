@@ -165,6 +165,7 @@ function advanceLobbyTurn(lobby) {
     const payload = { nextPlayerId: lobby.players[nextIndex]?.id || null, nextPlayerIndex: nextIndex };
     io.to(lobby.roomCode).emit("nextTurn", payload);
     io.to(lobby.roomCode).emit("updateTurn", payload);
+    io.to(lobby.roomCode).emit("turnChanged", payload);
   } catch (e) {
     // ignore
   }
@@ -405,7 +406,7 @@ io.on("connection", (socket) => {
   });
 
   // New camelCase event: kickPlayer (for client compatibility)
-  socket.on("kickPlayer", ({ roomCode, playerId } = {}, reply) => {
+  socket.on("kickPlayer", ({ roomCode, playerId, targetSocketId } = {}, reply) => {
     const normalizedCode = normalizeRoomCode(roomCode);
     const lobby = getLobbyByRoomCode(normalizedCode);
 
@@ -420,7 +421,10 @@ io.on("connection", (socket) => {
       return;
     }
 
-    const playerToKick = getLobbyPlayer(lobby, playerId);
+    let playerToKick = null;
+    if (playerId) playerToKick = getLobbyPlayer(lobby, playerId);
+    if (!playerToKick && targetSocketId) playerToKick = lobby.players.find(p => p.socketId === targetSocketId);
+
     if (!playerToKick) {
       sendReply(reply, { ok: false, error: "Игрок не найден" });
       return;
@@ -430,7 +434,7 @@ io.on("connection", (socket) => {
     try {
       const targetSocket = io.sockets.sockets.get(playerToKick.socketId);
       if (targetSocket) {
-        try { targetSocket.emit('kicked', { roomCode: normalizedCode }); } catch (e) {}
+        try { targetSocket.emit('you_are_kicked', { roomCode: normalizedCode }); } catch (e) {}
         // give client a moment to show message
         setTimeout(() => { try { targetSocket.disconnect(true); } catch (e) {} }, 120);
       }
@@ -476,6 +480,82 @@ io.on("connection", (socket) => {
     // broadcast to all players a friendly event
     io.to(normalizedCode).emit('abilityApplied', { actorName, actorNumber, abilityText, targetNumber, traitKey, newValue });
     broadcastRoom(normalizedCode);
+  });
+
+  // also accept legacy abilityUsed events from client-side abilities module
+  socket.on("abilityUsed", ({ roomCode, type, target, details } = {}) => {
+    const normalizedCode = normalizeRoomCode(roomCode);
+    const room = rooms.get(normalizedCode);
+    if (!room) return;
+    const actor = socket.id; // unknown actorName in legacy flow
+    const entry = `Способность ${type} применена: ${details}`;
+    room.gameLog = room.gameLog || [];
+    room.gameLog.push(entry);
+    io.to(normalizedCode).emit('abilityApplied', { actorName: actor, abilityText: type, targetNumber: target, traitKey: null, newValue: details });
+    broadcastRoom(normalizedCode);
+  });
+
+  // New actionPerformed handler: client reports an action (e.g., reveal)
+  socket.on('actionPerformed', ({ roomCode, action } = {}, reply) => {
+    const normalizedCode = normalizeRoomCode(roomCode);
+    const lobby = getLobbyByRoomCode(normalizedCode);
+    const room = rooms.get(normalizedCode);
+
+    if (!lobby || !room) {
+      sendReply(reply, { ok: false, error: 'Лобби не найдено' });
+      return;
+    }
+
+    if (!lobby.isGameStarted) {
+      sendReply(reply, { ok: false, error: 'Игра не начата' });
+      return;
+    }
+
+    const player = getLobbyPlayerBySocketId(lobby, socket.id);
+    const currentPlayer = getCurrentPlayer(lobby);
+
+    if (!player) {
+      sendReply(reply, { ok: false, error: 'Игрок не найден' });
+      return;
+    }
+
+    if (!currentPlayer) {
+      sendReply(reply, { ok: false, error: 'Текущий игрок не определен' });
+      return;
+    }
+
+    if (player.id !== currentPlayer.id) {
+      sendReply(reply, { ok: false, error: 'Это не ваша очередь' });
+      return;
+    }
+
+    // handle reveal action
+    if (action?.type === 'reveal') {
+      const playerNumber = Number(action.playerNumber);
+      const traitKey = action.traitKey;
+      if (!traitKey) {
+        sendReply(reply, { ok: false, error: 'Не указана характеристика' });
+        return;
+      }
+
+      // mark at room level (shared state)
+      setTraitRevealed(room, playerNumber, traitKey);
+      room.gameLog = room.gameLog || [];
+      room.gameLog.push(`Игрок ${player.playerNumber || player.name} открыл ${getTraitAccusative(traitKey)} Игрока ${playerNumber}`);
+
+      // advance turn
+      advanceLobbyTurn(lobby);
+
+      // broadcast updates
+      broadcastRoom(normalizedCode);
+      broadcastLobby(normalizedCode);
+      io.to(normalizedCode).emit('turnChanged', { nextPlayerIndex: lobby.currentTurnIndex, nextPlayerId: lobby.players[lobby.currentTurnIndex]?.id || null });
+
+      sendReply(reply, { ok: true });
+      return;
+    }
+
+    sendReply(reply, { ok: false, error: 'Неизвестное действие' });
   });
   
   socket.on("reveal-characteristic", ({ roomCode, characteristicKey } = {}, reply) => {
