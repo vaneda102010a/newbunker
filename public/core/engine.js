@@ -160,6 +160,35 @@ export function generateAgeForRace(race) {
   return `${numeric} ${getRussianYearWord(numeric)}`;
 }
 
+// Generate dependent shelter resources using a bell-curve (weighted) random for food.
+// Returns { duration: <months>, food: <months> }
+export function generateShelterResources(options = {}) {
+  const minDuration = Number(options.minDuration) || 6; // months
+  const maxDuration = Number(options.maxDuration) || 60; // months
+
+  // 1) Random total stay duration (inclusive)
+  const stayDuration = Math.floor(Math.random() * (maxDuration - minDuration + 1)) + minDuration;
+
+  // 2) Weighted random (approximate bell curve) helper
+  function getWeightedRandom(min, max, iterations = 3) {
+    let total = 0;
+    for (let i = 0; i < iterations; i++) {
+      total += Math.random();
+    }
+    const avg = total / iterations; // in [0,1]
+    // Map to integer range [min, max]
+    return Math.floor(avg * (max - min + 1) + min);
+  }
+
+  // Food supply: at least 1 month, at most the stay duration
+  const foodSupply = Math.max(1, Math.min(stayDuration, getWeightedRandom(1, stayDuration, 3)));
+
+  return {
+    duration: stayDuration,
+    food: foodSupply
+  };
+}
+
 export function attachThemeSelect(select = document.querySelector("#themeSelect")) {
   if (!select || select.dataset.themeEngineAttached === "true") {
     return;
