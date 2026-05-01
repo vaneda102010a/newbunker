@@ -724,10 +724,12 @@ button:focus-visible {
   max-width: none;
   min-width: 0;
   margin: 0;
-  padding: 20px;
+  /* increased padding by ~33% to give more vertical room */
+  padding: 26px;
   box-sizing: border-box;
   overflow-x: auto;
-  overflow-y: visible;
+  /* hide vertical scrollbars and rely on larger container height */
+  overflow-y: hidden;
   border: 1px solid var(--border);
   border-radius: 16px;
   background:
@@ -736,6 +738,24 @@ button:focus-visible {
   box-shadow: var(--shadow-soft);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+}
+
+/* Compact Gender/Age column: narrow, center-aligned, two-line clamp */
+.players-table td.trait-gender_age {
+  text-align: center;
+  max-width: 80px;
+  width: 80px;
+  white-space: normal;
+  word-break: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.players-table col.players-table-gender_age-col {
+  width: 80px;
 }
 
 .setup-modal-backdrop {

@@ -949,35 +949,7 @@
     0 0 14px var(--tone-glow);
 }
 
-.trait-tone-dot {
-  flex: 0 0 auto;
-  width: 7px;
-  height: 7px;
-  margin-top: 0.45em;
-  border-radius: 50%;
-  background: var(--tone-color);
-  box-shadow: 0 0 10px var(--tone-glow);
-}
-
-.trait-tone-good {
-  --tone-color: #8ee8a3;
-  --tone-glow: rgba(114, 209, 140, 0.38);
-}
-
-.trait-tone-bad {
-  --tone-color: #ff7f7f;
-  --tone-glow: rgba(239, 106, 106, 0.42);
-}
-
-.trait-tone-neutral {
-  --tone-color: rgba(180, 180, 188, 0.9);
-  --tone-glow: rgba(255, 255, 255, 0.08);
-}
-
-.trait-tone-rare {
-  --tone-color: #d9b86f;
-  --tone-glow: rgba(216, 191, 101, 0.5);
-}
+/* Removed utility/tonal dot indicators (.trait-tone-dot and --tone variants) */
 
 @keyframes traitRevealFlip {
   0% {
@@ -1309,34 +1281,7 @@
   width: auto;
 }
 
-.health-marker {
-  flex: 0 0 auto;
-  margin-top: 0.45em;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  box-shadow: 0 0 10px currentColor;
-}
-
-.health-good .health-marker {
-  background: var(--green);
-  color: rgba(114, 209, 140, 0.4);
-}
-
-.health-medium .health-marker {
-  background: var(--yellow);
-  color: rgba(216, 191, 101, 0.36);
-}
-
-.health-danger .health-marker {
-  background: var(--pink);
-  color: rgba(214, 106, 114, 0.4);
-}
-
-.health-critical .health-marker {
-  background: var(--red);
-  color: rgba(239, 106, 106, 0.44);
-}
+/* Removed health-marker styles (utility indicators) */
 
 .health-help {
   position: relative;

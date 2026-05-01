@@ -1567,10 +1567,11 @@ function renderPlayerTableRow(character, gameIsOver, visibleTableTraits = tableT
         if (trait.key === "gender_age") {
           const gender = cleanText(character.gender, "--");
           const age = cleanText(character.age, "--");
-          const combined = `${gender}, ${age}`;
+          const titleText = `${gender}, ${age}`;
+          const innerHtml = `<span class="gender-line">${escapeHtml(gender)}</span><br><span class="age-line">${escapeHtml(age)}</span>`;
           return `
-            <td class="players-table-cell trait-gender_age${isNewlyRevealedTrait(character.number, 'gender') || isNewlyRevealedTrait(character.number, 'age') ? " revealed-now-cell" : ""}" data-column="${columnIndex + 1}" title="${escapeHtml(combined)}">
-              ${renderTraitSignal(`<span class="trait-value">${escapeHtml(combined)}</span>`, getTraitTone(character, { key: 'age' }))}
+            <td class="players-table-cell trait-gender_age${isNewlyRevealedTrait(character.number, 'gender') || isNewlyRevealedTrait(character.number, 'age') ? " revealed-now-cell" : ""}" data-column="${columnIndex + 1}" title="${escapeHtml(titleText)}">
+              ${renderTraitSignal(innerHtml, getTraitTone(character, { key: 'age' }))}
             </td>
           `;
         }
@@ -1627,7 +1628,7 @@ function getTableTraitLabel(trait) {
   }
 
   if (trait.key === "gender_age") {
-    return "Пол / Возраст";
+    return "Пол/Возр.";
   }
 
   return trait.label;
@@ -1818,8 +1819,7 @@ function renderFantasyRaceGenderValue(character) {
 
 function renderTraitSignal(content, tone) {
   return `
-    <span class="trait-signal trait-tone-${tone}">
-      <span class="trait-tone-dot" aria-hidden="true"></span>
+    <span class="trait-signal">
       ${content}
     </span>
   `;
@@ -2009,9 +2009,8 @@ function renderHealthValue(character, tone = "neutral") {
 
   // Render only the health value and marker; remove redundant tooltip/question-mark element.
   return `
-    <span class="health-value health-${severity} trait-signal trait-tone-${tone}">
+    <span class="health-value health-${severity} trait-signal">
       <span class="health-text">
-        <span class="trait-tone-dot health-marker" aria-hidden="true"></span>
         <span class="trait-value">${escapeHtml(character.health)}</span>
       </span>
     </span>
