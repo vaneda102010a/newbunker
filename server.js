@@ -723,6 +723,10 @@ io.on("connection", (socket) => {
     room.excludedPlayers = [];
     room.usedAbilities = {};
     room.protectedPlayers = [];
+    room.turnState = createInitialRoomTurnState(pack, []);
+    room.lastRevealedTrait = null;
+    room.lastUsedAbility = null;
+    room.lastModifiedByAbility = null;
     clearVotingTimer(room);
     room.voting = null;
     room.gameLog = ["Ведущий сгенерировал новый пак"];
@@ -733,12 +737,26 @@ io.on("connection", (socket) => {
   socket.on("reveal-trait", ({ roomCode, playerNumber, traitKey } = {}) => {
     const room = rooms.get(normalizeRoomCode(roomCode));
     const player = getRoomPlayer(room, socket.id);
+    const number = Number(playerNumber);
 
-    if (!room || !player || !canReveal(player, Number(playerNumber))) {
+    if (!room || !player || !traitKey) {
       return;
     }
 
-    setTraitRevealed(room, Number(playerNumber), traitKey);
+    const state = normalizeRoomTurnState(room);
+
+    if (Number(player.playerNumber) !== number || Number(state.currentPlayerNumber) !== number || state.hasRevealed) {
+      return;
+    }
+
+    setTraitRevealed(room, number, traitKey);
+    room.lastRevealedTrait = {
+      playerNumber: number,
+      traitKey,
+      turnNumber: Number(room.turnState?.turnNumber) || 0,
+      timestamp: Date.now()
+    };
+    markRoomTurnReveal(room, number);
     room.gameLog.push(`Открыта характеристика Игрока ${Number(playerNumber)}: ${getTraitAccusative(traitKey)}`);
     broadcastRoom(room.roomCode);
   });
@@ -763,6 +781,7 @@ io.on("connection", (socket) => {
     }
 
     const number = Number(playerNumber);
+    const wasCurrentTurn = Number(room.turnState?.currentPlayerNumber) === number;
     const excludedSet = new Set(room.excludedPlayers);
     const protectedSet = new Set(room.protectedPlayers || []);
     if (excluded) {
@@ -781,6 +800,21 @@ io.on("connection", (socket) => {
       room.gameLog.push(`Ведущий вернул Игрока ${number}`);
     }
     room.excludedPlayers = Array.from(excludedSet);
+    if (wasCurrentTurn) {
+      room.turnState = {
+        currentPlayerNumber: getNextRoomActivePlayerAfter(room, number),
+        hasRevealed: false,
+        hasUsedAbility: false,
+        turnNumber: Math.max(1, Number(room.turnState?.turnNumber) || 1) + 1
+      };
+      if (room.turnState.currentPlayerNumber) {
+        room.gameLog.push(`Ход перешел к Игроку ${room.turnState.currentPlayerNumber}`);
+      }
+      advanceRoomTurnIfReady(room);
+    } else {
+      normalizeRoomTurnState(room);
+      advanceRoomTurnIfReady(room);
+    }
     broadcastRoom(room.roomCode);
   });
 
@@ -907,6 +941,12 @@ io.on("connection", (socket) => {
       return;
     }
 
+    const turn = normalizeRoomTurnState(room);
+    if (Number(turn.currentPlayerNumber) !== actorNumber || turn.hasUsedAbility) {
+      sendReply(reply, { ok: false, error: "Сейчас не ход этого игрока или способность уже использована в этом ходу" });
+      return;
+    }
+
     if (!state || typeof state !== "object") {
       sendReply(reply, { ok: false, error: "Нет состояния способности" });
       return;
@@ -1019,10 +1059,160 @@ function createRoom(roomCode, hostId, hostName) {
     excludedPlayers: [],
     usedAbilities: {},
     protectedPlayers: [],
+    turnState: createInitialRoomTurnState(null, []),
+    lastRevealedTrait: null,
+    lastUsedAbility: null,
+    lastModifiedByAbility: null,
     voting: null,
     votingTimer: null,
     gameLog: ["Комната создана"]
   };
+}
+
+function createInitialRoomTurnState(pack, excludedPlayers = []) {
+  const excluded = new Set((excludedPlayers || []).map(Number));
+  const firstPlayer = (pack?.players || [])
+    .map((player) => Number(player.number))
+    .find((number) => Number.isFinite(number) && !excluded.has(number)) || null;
+
+  return {
+    currentPlayerNumber: firstPlayer,
+    hasRevealed: false,
+    hasUsedAbility: false,
+    turnNumber: firstPlayer ? 1 : 0
+  };
+}
+
+function getRoomActivePlayerNumbers(room) {
+  const excluded = new Set((room?.excludedPlayers || []).map(Number));
+  return (room?.generatedPack?.players || [])
+    .map((player) => Number(player.number))
+    .filter((number) => Number.isFinite(number) && !excluded.has(number));
+}
+
+function getNextRoomActivePlayerAfter(room, playerNumber) {
+  const orderedPlayers = (room?.generatedPack?.players || []).map((player) => Number(player.number)).filter(Number.isFinite);
+  const activePlayers = getRoomActivePlayerNumbers(room);
+
+  if (activePlayers.length === 0) {
+    return null;
+  }
+
+  const startIndex = Math.max(0, orderedPlayers.indexOf(Number(playerNumber)));
+  for (let offset = 1; offset <= orderedPlayers.length; offset += 1) {
+    const candidate = orderedPlayers[(startIndex + offset) % orderedPlayers.length];
+    if (activePlayers.includes(candidate)) {
+      return candidate;
+    }
+  }
+
+  return activePlayers[0];
+}
+
+function normalizeRoomTurnState(room) {
+  const activePlayers = getRoomActivePlayerNumbers(room);
+
+  if (activePlayers.length === 0) {
+    room.turnState = createInitialRoomTurnState(null, []);
+    return room.turnState;
+  }
+
+  const requestedPlayer = Number(room.turnState?.currentPlayerNumber);
+  room.turnState = {
+    currentPlayerNumber: activePlayers.includes(requestedPlayer) ? requestedPlayer : activePlayers[0],
+    hasRevealed: Boolean(room.turnState?.hasRevealed),
+    hasUsedAbility: Boolean(room.turnState?.hasUsedAbility),
+    turnNumber: Math.max(1, Number(room.turnState?.turnNumber) || 1)
+  };
+
+  return room.turnState;
+}
+
+function getRoomPlayerCharacter(room, playerNumber) {
+  return (room?.generatedPack?.players || []).find((player) => Number(player.number) === Number(playerNumber)) || null;
+}
+
+function hasRoomAvailableReveal(room, playerNumber) {
+  const traitKeys = [
+    "gender",
+    "bodyType",
+    "trait",
+    "age",
+    "profession",
+    "health",
+    "hobby",
+    "phobia",
+    "largeInventory",
+    "backpack",
+    "additionalInfo",
+    "specialAbility"
+  ];
+
+  return traitKeys.some((traitKey) => !room.revealedTraits?.[playerNumber]?.[traitKey]);
+}
+
+function hasRoomAvailableAbility(room, playerNumber) {
+  const player = getRoomPlayerCharacter(room, playerNumber);
+  if (!player) {
+    return false;
+  }
+
+  return [player.specialAbility, player.specialAbility2].some((ability, index) => {
+    const text = String(ability || "").trim();
+    return text && !room.usedAbilities?.[`${playerNumber}:${index}`];
+  });
+}
+
+function shouldAdvanceRoomTurn(room) {
+  const state = normalizeRoomTurnState(room);
+  const playerNumber = state.currentPlayerNumber;
+
+  if (!playerNumber) {
+    return false;
+  }
+
+  return (state.hasRevealed || !hasRoomAvailableReveal(room, playerNumber))
+    && (state.hasUsedAbility || !hasRoomAvailableAbility(room, playerNumber));
+}
+
+function advanceRoomTurnIfReady(room, force = false) {
+  if (!force && !shouldAdvanceRoomTurn(room)) {
+    return false;
+  }
+
+  const activePlayers = getRoomActivePlayerNumbers(room);
+  if (activePlayers.length === 0) {
+    room.turnState = createInitialRoomTurnState(null, []);
+    return false;
+  }
+
+  const turnPlayers = activePlayers.filter((number) => hasRoomAvailableReveal(room, number) || hasRoomAvailableAbility(room, number));
+  const queue = turnPlayers.length > 0 ? turnPlayers : activePlayers;
+  const previousPlayer = Number(room.turnState?.currentPlayerNumber);
+  const currentIndex = queue.indexOf(previousPlayer);
+  const nextIndex = queue.length === 1 ? 0 : (Math.max(0, currentIndex) + 1) % queue.length;
+  const nextPlayer = queue[nextIndex];
+
+  room.turnState = {
+    currentPlayerNumber: nextPlayer,
+    hasRevealed: false,
+    hasUsedAbility: false,
+    turnNumber: Math.max(1, Number(room.turnState?.turnNumber) || 1) + 1
+  };
+
+  if (previousPlayer !== nextPlayer) {
+    room.gameLog.push(`Ход перешел к Игроку ${nextPlayer}`);
+  }
+
+  return true;
+}
+
+function markRoomTurnReveal(room, playerNumber) {
+  const state = normalizeRoomTurnState(room);
+  if (Number(state.currentPlayerNumber) === Number(playerNumber)) {
+    state.hasRevealed = true;
+  }
+  advanceRoomTurnIfReady(room);
 }
 
 function createRoomCode() {
@@ -1385,6 +1575,22 @@ function applySharedState(room, state) {
     room.protectedPlayers = state.protectedPlayers;
   }
 
+  if (state.turnState) {
+    room.turnState = state.turnState;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(state, "lastRevealedTrait")) {
+    room.lastRevealedTrait = state.lastRevealedTrait;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(state, "lastUsedAbility")) {
+    room.lastUsedAbility = state.lastUsedAbility;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(state, "lastModifiedByAbility")) {
+    room.lastModifiedByAbility = state.lastModifiedByAbility;
+  }
+
   if (Array.isArray(state.gameLog)) {
     room.gameLog = state.gameLog.slice(-80);
   }
@@ -1401,6 +1607,10 @@ function serializeRoom(room) {
     excludedPlayers: room.excludedPlayers,
     usedAbilities: room.usedAbilities,
     protectedPlayers: room.protectedPlayers,
+    turnState: normalizeRoomTurnState(room),
+    lastRevealedTrait: room.lastRevealedTrait || null,
+    lastUsedAbility: room.lastUsedAbility || null,
+    lastModifiedByAbility: room.lastModifiedByAbility || null,
     voting: serializeVoting(room),
     gameLog: room.gameLog.slice(-80)
   };

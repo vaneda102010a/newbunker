@@ -62,11 +62,11 @@ const characterTraits = [
 
 const tableTraits = [
   { key: "gender", label: "Пол" },
-  { key: "bodyType", label: "Тип тела" },
-  { key: "trait", label: "Черта" },
   { key: "age", label: "Возраст" },
-  { key: "profession", label: "Профессия" },
   { key: "health", label: "Здоровье" },
+  { key: "trait", label: "Черта" },
+  { key: "bodyType", label: "Тип тела" },
+  { key: "profession", label: "Профессия" },
   { key: "hobby", label: "Хобби" },
   { key: "phobia", label: "Фобия" },
   { key: "largeInventory", label: "Крупное" },
@@ -256,6 +256,10 @@ let usedAbilities = {};
 let protectedPlayers = new Set();
 let gameLog = [];
 let pendingAbility = null;
+let turnState = createEmptyTurnState();
+let lastRevealedTrait = null;
+let lastUsedAbility = null;
+let lastModifiedByAbility = null;
 let appRole = "";
 let currentPlayerNumber = 1;
 let currentPlayerName = "";
@@ -724,12 +728,250 @@ function isOnlineRoom() {
   return Boolean(currentRoomCode && socket?.connected);
 }
 
-function canRevealTrait(playerNumber) {
+function createEmptyTurnState() {
+  return {
+    currentPlayerNumber: null,
+    hasRevealed: false,
+    hasUsedAbility: false,
+    turnNumber: 0
+  };
+}
+
+function getActivePlayerNumbers() {
+  if (!currentPack?.players?.length) {
+    return [];
+  }
+
+  return currentPack.players
+    .map((player) => Number(player.number))
+    .filter((number) => Number.isFinite(number) && !excludedPlayers.has(number));
+}
+
+function getNextActivePlayerAfter(playerNumber) {
+  const orderedPlayers = (currentPack?.players || []).map((player) => Number(player.number)).filter(Number.isFinite);
+  const activePlayers = getActivePlayerNumbers();
+
+  if (activePlayers.length === 0) {
+    return null;
+  }
+
+  const startIndex = Math.max(0, orderedPlayers.indexOf(Number(playerNumber)));
+  for (let offset = 1; offset <= orderedPlayers.length; offset += 1) {
+    const candidate = orderedPlayers[(startIndex + offset) % orderedPlayers.length];
+    if (activePlayers.includes(candidate)) {
+      return candidate;
+    }
+  }
+
+  return activePlayers[0];
+}
+
+function createInitialTurnState(pack = currentPack) {
+  const firstPlayer = (pack?.players || [])
+    .map((player) => Number(player.number))
+    .find((number) => Number.isFinite(number) && !excludedPlayers.has(number)) || null;
+
+  return {
+    currentPlayerNumber: firstPlayer,
+    hasRevealed: false,
+    hasUsedAbility: false,
+    turnNumber: 1
+  };
+}
+
+function normalizeTurnState(state = turnState) {
+  const activePlayers = getActivePlayerNumbers();
+
+  if (activePlayers.length === 0) {
+    return createEmptyTurnState();
+  }
+
+  const requestedPlayer = Number(state?.currentPlayerNumber);
+  const currentPlayerNumber = activePlayers.includes(requestedPlayer)
+    ? requestedPlayer
+    : activePlayers[0];
+
+  return {
+    currentPlayerNumber,
+    hasRevealed: Boolean(state?.hasRevealed),
+    hasUsedAbility: Boolean(state?.hasUsedAbility),
+    turnNumber: Math.max(1, Number(state?.turnNumber) || 1)
+  };
+}
+
+function ensureTurnState() {
+  turnState = normalizeTurnState(turnState);
+  return turnState;
+}
+
+function getCurrentTurnPlayerNumber() {
+  return ensureTurnState().currentPlayerNumber;
+}
+
+function isCurrentTurnPlayer(playerNumber) {
+  return Number(playerNumber) === Number(getCurrentTurnPlayerNumber());
+}
+
+function canControlTurnPlayer(playerNumber) {
+  if (!isCurrentTurnPlayer(playerNumber) || excludedPlayers.has(Number(playerNumber))) {
+    return false;
+  }
+
+  if (isOnlineRoom()) {
+    return isOwnPlayer(playerNumber);
+  }
+
   return isHostView() || isOwnPlayer(playerNumber);
 }
 
+function hasAvailableReveal(playerNumber) {
+  return characterTraits.some((trait) => !isTraitRevealed(playerNumber, trait.key));
+}
+
+function hasAvailableAbility(playerNumber) {
+  if (!canViewTrait(playerNumber, "specialAbility")) {
+    return false;
+  }
+
+  const player = getPlayerByNumber(playerNumber);
+  return getPlayerAbilityItems(player).some((ability) => ability.name && !ability.locked && !ability.used);
+}
+
+function shouldAdvanceCurrentTurn() {
+  const state = ensureTurnState();
+  const playerNumber = state.currentPlayerNumber;
+
+  if (!playerNumber) {
+    return false;
+  }
+
+  const revealDone = state.hasRevealed || !hasAvailableReveal(playerNumber);
+  const abilityDone = state.hasUsedAbility || !hasAvailableAbility(playerNumber);
+  return revealDone && abilityDone;
+}
+
+function advanceTurnIfReady(options = {}) {
+  const force = Boolean(options.force);
+
+  if (!force && !shouldAdvanceCurrentTurn()) {
+    return false;
+  }
+
+  const activePlayers = getActivePlayerNumbers();
+
+  if (activePlayers.length === 0) {
+    turnState = createEmptyTurnState();
+    return false;
+  }
+
+  const turnPlayers = activePlayers.filter((number) => hasAvailableReveal(number) || hasAvailableAbility(number));
+  const queue = turnPlayers.length > 0 ? turnPlayers : activePlayers;
+  const previousPlayer = Number(turnState.currentPlayerNumber);
+  const currentIndex = queue.indexOf(previousPlayer);
+  const nextIndex = queue.length === 1 ? 0 : (Math.max(0, currentIndex) + 1) % queue.length;
+  const nextPlayer = queue[nextIndex];
+
+  turnState = {
+    currentPlayerNumber: nextPlayer,
+    hasRevealed: false,
+    hasUsedAbility: false,
+    turnNumber: Math.max(1, Number(turnState.turnNumber) || 1) + 1
+  };
+
+  if (previousPlayer !== nextPlayer) {
+    addGameLog(`Ход перешел к Игроку ${nextPlayer}`);
+  }
+
+  return true;
+}
+
+function reconcileTurnAfterPlayerListChange() {
+  const before = Number(turnState.currentPlayerNumber);
+  const activePlayers = getActivePlayerNumbers();
+
+  if (before && !activePlayers.includes(before)) {
+    turnState = {
+      currentPlayerNumber: getNextActivePlayerAfter(before),
+      hasRevealed: false,
+      hasUsedAbility: false,
+      turnNumber: Math.max(1, Number(turnState.turnNumber) || 1) + 1
+    };
+
+    if (turnState.currentPlayerNumber) {
+      addGameLog(`Ход перешел к Игроку ${turnState.currentPlayerNumber}`);
+    }
+
+    advanceTurnIfReady();
+    return;
+  }
+
+  turnState = normalizeTurnState(turnState);
+
+  if (before && before !== Number(turnState.currentPlayerNumber) && turnState.currentPlayerNumber) {
+    turnState.hasRevealed = false;
+    turnState.hasUsedAbility = false;
+    turnState.turnNumber = Math.max(1, Number(turnState.turnNumber) || 1) + 1;
+    addGameLog(`Ход перешел к Игроку ${turnState.currentPlayerNumber}`);
+  }
+
+  advanceTurnIfReady();
+}
+
+function markTurnReveal(playerNumber) {
+  const state = ensureTurnState();
+
+  if (Number(state.currentPlayerNumber) === Number(playerNumber)) {
+    state.hasRevealed = true;
+  }
+
+  advanceTurnIfReady();
+}
+
+function markTurnAbility(playerNumber) {
+  const state = ensureTurnState();
+
+  if (Number(state.currentPlayerNumber) === Number(playerNumber)) {
+    state.hasUsedAbility = true;
+  }
+
+  advanceTurnIfReady();
+}
+
+function isLastRevealedTrait(playerNumber, traitKey) {
+  return Number(lastRevealedTrait?.playerNumber) === Number(playerNumber) && lastRevealedTrait?.traitKey === traitKey;
+}
+
+function isLastUsedAbility(playerNumber, abilityIndex) {
+  return Number(lastUsedAbility?.playerNumber) === Number(playerNumber) && Number(lastUsedAbility?.abilityIndex) === Number(abilityIndex);
+}
+
+function isLastModifiedByAbility(playerNumber, traitKey) {
+  return Number(lastModifiedByAbility?.targetPlayerNumber) === Number(playerNumber) && lastModifiedByAbility?.traitKey === traitKey;
+}
+
+function setLastModifiedByAbility(targetPlayerNumber, traitKey, context) {
+  if (!targetPlayerNumber || !traitKey || !context || Number(targetPlayerNumber) === Number(context.actorNumber)) {
+    return;
+  }
+
+  lastModifiedByAbility = {
+    targetPlayerNumber: Number(targetPlayerNumber),
+    traitKey,
+    sourcePlayerNumber: Number(context.actorNumber),
+    abilityIndex: Number(context.abilityIndex),
+    turnNumber: Number(turnState.turnNumber) || 0,
+    timestamp: Date.now()
+  };
+}
+
+function canRevealTrait(playerNumber) {
+  const state = ensureTurnState();
+  return canControlTurnPlayer(playerNumber) && !state.hasRevealed && hasAvailableReveal(playerNumber);
+}
+
 function canUseAbility(playerNumber) {
-  return isOwnPlayer(playerNumber);
+  const state = ensureTurnState();
+  return canControlTurnPlayer(playerNumber) && !state.hasUsedAbility && hasAvailableAbility(playerNumber);
 }
 
 function getConfiguredPlayerCount() {
@@ -822,11 +1064,10 @@ function updateControlAvailability() {
       try {
         const action = btn.dataset.action;
         if (action === 'use-ability') {
-          // abilities are allowed even out of turn
-          btn.disabled = false;
+          btn.disabled = !canUseAbility(Number(btn.dataset.player));
         } else if (action === 'reveal-trait') {
           btn.disabled = !canRevealTrait(Number(btn.dataset.player));
-        } else {
+        } else if (!["exclude", "reveal-all", "reroll-trait"].includes(action)) {
           btn.disabled = !isMyTurn;
         }
       } catch (e) {}
@@ -1191,11 +1432,16 @@ function applyRoomState({ room, currentUser }) {
   excludedPlayers = new Set(room.excludedPlayers || []);
   usedAbilities = room.usedAbilities || {};
   protectedPlayers = new Set(room.protectedPlayers || []);
+  turnState = room.turnState || turnState;
+  lastRevealedTrait = Object.prototype.hasOwnProperty.call(room, "lastRevealedTrait") ? room.lastRevealedTrait : lastRevealedTrait;
+  lastUsedAbility = Object.prototype.hasOwnProperty.call(room, "lastUsedAbility") ? room.lastUsedAbility : lastUsedAbility;
+  lastModifiedByAbility = Object.prototype.hasOwnProperty.call(room, "lastModifiedByAbility") ? room.lastModifiedByAbility : lastModifiedByAbility;
   gameLog = room.gameLog || [];
   votingState = room.voting || null;
 
   if (room.generatedPack) {
     currentPack = room.generatedPack;
+    turnState = normalizeTurnState(turnState);
     renderPack(currentPack);
   } else {
     currentPack = null;
@@ -1241,6 +1487,10 @@ function collectSharedState() {
     excludedPlayers: Array.from(excludedPlayers),
     usedAbilities,
     protectedPlayers: Array.from(protectedPlayers),
+    turnState: ensureTurnState(),
+    lastRevealedTrait,
+    lastUsedAbility,
+    lastModifiedByAbility,
     gameLog
   };
 }
@@ -1773,6 +2023,7 @@ function renderPack(pack) {
     themeSelect.value = packThemeId;
   }
   setActiveTheme(packThemeId);
+  turnState = normalizeTurnState(turnState);
   updatePackSummary(pack);
   if (!isOnlineRoom()) {
     currentPlayerNumber = clampPlayerNumber(currentPlayerNumber);
@@ -1814,7 +2065,8 @@ function renderCharacters(characters) {
     const card = document.createElement("article");
     const isExcluded = excludedPlayers.has(character.number);
     const isOwn = isOwnPlayer(character.number);
-    card.className = `character-card${isExcluded ? " excluded" : ""}${isOwn ? " own-card" : ""}`;
+    const isCurrentTurn = isCurrentTurnPlayer(character.number);
+    card.className = `character-card${isExcluded ? " excluded" : ""}${isOwn ? " own-card" : ""}${isCurrentTurn ? " current-turn-card" : ""}`;
     card.style.setProperty("--accent", character.accent);
 
     card.innerHTML = `
@@ -1893,14 +2145,15 @@ function renderPlayersTable(characters) {
 function renderPlayerTableRow(character, gameIsOver, visibleTableTraits = tableTraits) {
   const isExcluded = excludedPlayers.has(character.number);
   const isOwn = isOwnPlayer(character.number);
+  const isCurrentTurn = isCurrentTurnPlayer(character.number);
   const playerTitle = getTablePlayerTitle(character);
 
   return `
-    <tr class="${isExcluded ? "excluded" : ""}${isOwn ? " own-row" : ""}" style="--accent: ${character.accent}" data-player="${character.number}">
-      <td class="players-table-player" title="${escapeHtml(playerTitle)}">${renderPlayerTableSlot(character, isExcluded, gameIsOver)}</td>
+    <tr class="${isExcluded ? "excluded" : ""}${isOwn ? " own-row" : ""}${isCurrentTurn ? " current-turn-row" : ""}" style="--accent: ${character.accent}" data-player="${character.number}">
+      <td class="players-table-player${isCurrentTurn ? " current-turn-player-cell" : ""}" title="${escapeHtml(playerTitle)}">${renderPlayerTableSlot(character, isExcluded, gameIsOver)}</td>
       ${visibleTableTraits.map((trait, columnIndex) => {
         return `
-          <td class="players-table-cell trait-${trait.key}${isNewlyRevealedTrait(character.number, trait.key) ? " revealed-now-cell" : ""}" data-column="${columnIndex + 1}" title="${escapeHtml(getTableTraitTitle(character, trait))}">
+          <td class="players-table-cell trait-${trait.key}${isNewlyRevealedTrait(character.number, trait.key) ? " revealed-now-cell" : ""}${isLastRevealedTrait(character.number, trait.key) ? " last-revealed-trait" : ""}${isLastModifiedByAbility(character.number, trait.key) ? " last-modified-by-ability" : ""}" data-column="${columnIndex + 1}" title="${escapeHtml(getTableTraitTitle(character, trait))}">
             ${renderTraitValue(character, trait, { view: VIEW_TABLE })}
           </td>
         `;
@@ -1987,9 +2240,11 @@ function renderTraitRow(character, trait) {
   const value = renderTraitValue(character, trait);
   const icon = traitIcons[trait.key] || "•";
   const revealClass = isNewlyRevealedTrait(character.number, trait.key) ? " revealed-now-row" : "";
+  const lastRevealClass = isLastRevealedTrait(character.number, trait.key) ? " last-revealed-trait" : "";
+  const modifiedClass = isLastModifiedByAbility(character.number, trait.key) ? " last-modified-by-ability" : "";
 
   return `
-    <div class="trait-row trait-${trait.key}${revealClass}">
+    <div class="trait-row trait-${trait.key}${revealClass}${lastRevealClass}${modifiedClass}">
       <dt><span class="trait-label-icon" aria-hidden="true">${icon}</span><span>${trait.label}</span></dt>
       <dd>${value}</dd>
     </div>
@@ -2069,7 +2324,7 @@ function renderVisibleTraitValue(character, trait, isPublic, options = {}) {
         ${value}
         <span class="trait-row-actions">${revealAction}${rerollAction}</span>
       </div>
-      ${renderVisibilityBadge(character.number, isPublic)}
+      ${options.view === VIEW_TABLE ? "" : renderVisibilityBadge(character.number, isPublic)}
     </div>
   `;
 }
@@ -2132,9 +2387,10 @@ function renderAbilitiesPanelCard(character) {
   const playerName = getTablePlayerTitle(character);
   const abilityItems = getPlayerAbilityItems(character);
   const isOwn = isOwnPlayer(character.number);
+  const isCurrentTurn = isCurrentTurnPlayer(character.number);
 
   return `
-    <article class="ability-player-card${isOwn ? " own-ability-card" : ""}" style="--accent: ${character.accent}" data-player="${character.number}">
+    <article class="ability-player-card${isOwn ? " own-ability-card" : ""}${isCurrentTurn ? " current-turn-card" : ""}" style="--accent: ${character.accent}" data-player="${character.number}">
       <header class="ability-player-header">
         <span class="ability-player-number">${character.number}</span>
         <h3>${escapeHtml(playerName)}</h3>
@@ -2165,15 +2421,16 @@ function renderAbilityPanelRow(playerNumber, ability) {
 
   const canUse = canUseAbility(playerNumber);
   const isDisabled = ability.used || !canUse;
+  const isLastUsed = isLastUsedAbility(playerNumber, ability.index);
   const actionAttrs = !isDisabled
     ? `data-action="use-ability" data-player="${playerNumber}" data-ability-index="${ability.index}"`
     : "";
   const tooltip = ability.used ? "Уже использовано" : ability.name;
 
   return `
-    <div class="ability-panel-row${ability.used ? " used" : ""}">
+    <div class="ability-panel-row${ability.used ? " used" : ""}${isLastUsed ? " last-used-ability" : ""}">
       <span class="ability-panel-label">${label}</span>
-      <button class="ability-panel-button${ability.used ? " used" : ""}" type="button" ${actionAttrs} data-tooltip="${escapeHtml(tooltip)}" aria-label="${escapeHtml(ability.name)}" ${isDisabled ? "disabled" : ""}>
+      <button class="ability-panel-button${ability.used ? " used" : ""}${isLastUsed ? " last-used-ability" : ""}" type="button" ${actionAttrs} data-tooltip="${escapeHtml(tooltip)}" aria-label="${escapeHtml(ability.name)}" ${isDisabled ? "disabled" : ""}>
         <span class="ability-panel-icon" aria-hidden="true">${ability.used ? "&#10003;" : "&#9889;"}</span>
         <span class="ability-panel-name">${escapeHtml(ability.used ? "Использовано" : ability.name)}</span>
       </button>
@@ -2234,8 +2491,8 @@ function renderSpecialAbilities(character) {
   const used0 = Boolean(usedAbilities[`${character.number}:0`]);
   const used1 = Boolean(usedAbilities[`${character.number}:1`]);
 
-  const slot0Class = used0 ? "ability-slot opened" : "ability-slot closed";
-  const slot1Class = used1 ? "ability-slot opened" : "ability-slot closed";
+  const slot0Class = `${used0 ? "ability-slot opened" : "ability-slot closed"}${isLastUsedAbility(character.number, 0) ? " last-used-ability" : ""}`;
+  const slot1Class = `${used1 ? "ability-slot opened" : "ability-slot closed"}${isLastUsedAbility(character.number, 1) ? " last-used-ability" : ""}`;
 
   return `
     <div class="special-abilities-container">
@@ -2261,9 +2518,10 @@ function renderAbilityCard(playerNumber, ability, abilityIndex) {
   const tooltip = escapeHtml(ability);
   const isLocked = analysis.effectType === ABILITY_EFFECT_TYPES.UNSUPPORTED;
   const isDisabled = isUsed || isLocked || !canUseAbility(playerNumber);
+  const isLastUsed = isLastUsedAbility(playerNumber, abilityIndex);
 
   return `
-    <button class="ability-btn ability-use-button ability-type-${presentation.visualType}${isUsed ? " used" : ""}${isLocked ? " locked" : ""}" type="button" ${!isDisabled ? `data-action="use-ability" data-player="${playerNumber}" data-ability-index="${abilityIndex}"` : ""} data-tooltip="${isLocked ? "Эта способность пока недоступна" : tooltip}" aria-label="${tooltip}" ${isDisabled ? "disabled" : ""}>
+    <button class="ability-btn ability-use-button ability-type-${presentation.visualType}${isUsed ? " used" : ""}${isLocked ? " locked" : ""}${isLastUsed ? " last-used-ability" : ""}" type="button" ${!isDisabled ? `data-action="use-ability" data-player="${playerNumber}" data-ability-index="${abilityIndex}"` : ""} data-tooltip="${isLocked ? "Эта способность пока недоступна" : tooltip}" aria-label="${tooltip}" ${isDisabled ? "disabled" : ""}>
       ${isUsed
         ? `<span class="ability-used-mark" aria-hidden="true">✓</span><span class="ability-label">Использовано</span>`
         : `<span class="ability-icon" aria-hidden="true">${presentation.icon}</span><span class="ability-label">${escapeHtml(isLocked ? "Недоступно" : presentation.label)}</span>`}
@@ -2762,6 +3020,11 @@ function markNewlyRevealedTraits(nextRevealedTraits) {
 }
 
 function revealTrait(playerNumber, traitKey) {
+  if (!canRevealTrait(playerNumber)) {
+    setStatus("Сейчас ход другого игрока или раскрытие уже использовано в этом ходу.", "error");
+    return;
+  }
+
   if (isOnlineRoom()) {
     socket.emit("reveal-trait", { roomCode: currentRoomCode, playerNumber, traitKey });
     return;
@@ -2770,6 +3033,7 @@ function revealTrait(playerNumber, traitKey) {
   const wasOpened = setTraitRevealed(playerNumber, traitKey);
   if (wasOpened) {
     addGameLog(`Открыта характеристика Игрока ${playerNumber}: ${getTraitAccusative(traitKey)}`);
+    markTurnReveal(playerNumber);
     renderGameLog();
   }
   renderPack(currentPack);
@@ -2800,6 +3064,12 @@ function setTraitRevealed(playerNumber, traitKey) {
 
   if (wasHidden) {
     newlyRevealedTraitKeys.add(getTraitRevealKey(playerNumber, traitKey));
+    lastRevealedTrait = {
+      playerNumber: Number(playerNumber),
+      traitKey,
+      turnNumber: Number(turnState.turnNumber) || 0,
+      timestamp: Date.now()
+    };
   }
 
   revealedTraits[playerNumber][traitKey] = true;
@@ -2840,6 +3110,7 @@ function toggleExcluded(playerNumber) {
     excludedPlayers.add(playerNumber);
   }
 
+  reconcileTurnAfterPlayerListChange();
   renderPack(currentPack);
 
   if (isGameOver()) {
@@ -2968,6 +3239,10 @@ function resetGameState(pack) {
   revealedTraits = {};
   usedAbilities = {};
   protectedPlayers = new Set();
+  turnState = createInitialTurnState(pack);
+  lastRevealedTrait = null;
+  lastUsedAbility = null;
+  lastModifiedByAbility = null;
   gameLog = [];
   pendingAbility = null;
   votingState = null;
@@ -3269,9 +3544,17 @@ function confirmAbilityUse() {
   }
 
   usedAbilities[abilityKey] = true;
+  lastUsedAbility = {
+    playerNumber: Number(context.actorNumber),
+    abilityIndex: Number(context.abilityIndex),
+    abilityKey,
+    turnNumber: Number(turnState.turnNumber) || 0,
+    timestamp: Date.now()
+  };
   addGameLog(`Игрок ${context.actorNumber} использовал способность: ${context.abilityText}`);
 
   const wasApplied = executeAbility(context);
+  markTurnAbility(context.actorNumber);
   closeAbilityModal();
   renderPack(currentPack);
   renderGameLog();
@@ -3309,6 +3592,7 @@ function executeAbility(context) {
     // highlight swapped trait cells
     highlightTraitCell(context.actorNumber, context.traitKey);
     highlightTraitCell(context.targetNumber, context.traitKey);
+    setLastModifiedByAbility(context.targetNumber, context.traitKey, context);
     return true;
   }
 
@@ -3318,6 +3602,7 @@ function executeAbility(context) {
       highlightTraitCell(context.actorNumber, traitKey);
       highlightTraitCell(context.targetNumber, traitKey);
     });
+    setLastModifiedByAbility(context.targetNumber, "gender", context);
     return true;
   }
 
@@ -3325,6 +3610,7 @@ function executeAbility(context) {
     applyStealAbility(context);
     highlightTraitCell(context.actorNumber, context.traitKey);
     highlightTraitCell(context.targetNumber, context.traitKey);
+    setLastModifiedByAbility(context.targetNumber, context.traitKey, context);
     return true;
   }
 
@@ -3338,6 +3624,7 @@ function executeAbility(context) {
   if (context.analysis.effectType === ABILITY_EFFECT_TYPES.REROLL) {
     applyRerollAbility(context);
     if (context.traitKey) highlightTraitCell(context.targetNumber || context.actorNumber, context.traitKey);
+    setLastModifiedByAbility(context.targetNumber || context.actorNumber, context.traitKey, context);
     return true;
   }
 
@@ -3357,12 +3644,14 @@ function executeAbility(context) {
   if (context.analysis.effectType === ABILITY_EFFECT_TYPES.SET_HEALTH) {
     applySetHealthAbility(context);
     highlightTraitCell(context.targetNumber || context.actorNumber, "health");
+    setLastModifiedByAbility(context.targetNumber || context.actorNumber, "health", context);
     return true;
   }
 
   if (context.analysis.effectType === ABILITY_EFFECT_TYPES.POLYMORPH) {
     applyPolymorphAbility(context);
     ["gender", "bodyType", "age"].forEach((traitKey) => highlightTraitCell(context.targetNumber, traitKey));
+    setLastModifiedByAbility(context.targetNumber, "gender", context);
     return true;
   }
 
