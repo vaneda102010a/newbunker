@@ -9,7 +9,118 @@
   <link id="theme-style" rel="stylesheet">
 </head>
 <body>
-  <div class="page app-container">
+  <section class="start-screen" id="startScreen" aria-label="Главное меню">
+    <video class="start-video" autoplay muted loop playsinline aria-hidden="true">
+      <source src="/images/start.mp4" type="video/mp4">
+    </video>
+    <div class="start-overlay" aria-hidden="true"></div>
+
+    <div class="start-menu">
+      <div class="start-actions">
+        <button class="start-menu-button" id="startCreateButton" type="button">
+          <svg class="start-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          <span>Создать игру</span>
+        </button>
+        <button class="start-menu-button start-menu-button--join" id="startJoinButton" type="button">
+          <svg class="start-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <span>Присоединиться к игре</span>
+        </button>
+      </div>
+
+      <button class="start-test-button" id="startDevTestButton" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" width="13" height="13">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+        </svg>
+        Быстрый тест
+      </button>
+    </div>
+  </section>
+
+  <div class="modal-backdrop start-flow-modal" id="startCreateModal" hidden>
+    <div class="confirm-modal start-menu-modal" role="dialog" aria-modal="true" aria-labelledby="startCreateTitle">
+      <button class="modal-close-button" type="button" data-start-modal-close aria-label="Закрыть">×</button>
+      <span class="eyebrow">Админ</span>
+      <h3 id="startCreateTitle">Настройки игры</h3>
+
+      <label class="field modal-field">
+        <span>Имя игрока</span>
+        <input id="startCreateNameInput" type="text" placeholder="Ваше имя" autocomplete="name">
+      </label>
+
+      <label class="field modal-field">
+        <span>Тема</span>
+        <select id="startCreateThemeSelect"></select>
+      </label>
+
+      <label class="field modal-field">
+        <span>Количество игроков</span>
+        <select id="startCreatePlayerCountSelect">
+          <option selected>6</option>
+          <option>4</option>
+          <option>5</option>
+          <option>7</option>
+          <option>8</option>
+        </select>
+      </label>
+
+      <label class="field modal-field">
+        <span>Стиль</span>
+        <select id="startCreateStyleSelect">
+          <option selected>Смешной</option>
+          <option>Реалистичный</option>
+          <option>Темный</option>
+          <option>Абсурдный</option>
+        </select>
+      </label>
+
+      <label class="field modal-field">
+        <span>Уровень жести</span>
+        <select id="startCreateDifficultySelect">
+          <option selected>Средний</option>
+          <option>Легкий</option>
+          <option>Жесткий</option>
+        </select>
+      </label>
+
+      <div class="modal-actions">
+        <button class="main-button" id="startCreateConfirmButton" type="button">Создать</button>
+        <button class="ghost-button" type="button" data-start-modal-close>Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop start-flow-modal" id="startJoinModal" hidden>
+    <div class="confirm-modal start-menu-modal" role="dialog" aria-modal="true" aria-labelledby="startJoinTitle">
+      <button class="modal-close-button" type="button" data-start-modal-close aria-label="Закрыть">×</button>
+      <span class="eyebrow">Игрок</span>
+      <h3 id="startJoinTitle">Войти в комнату</h3>
+
+      <label class="field modal-field">
+        <span>Имя игрока</span>
+        <input id="startJoinNameInput" type="text" placeholder="Ваше имя" autocomplete="name">
+      </label>
+
+      <label class="field modal-field">
+        <span>Код комнаты</span>
+        <input id="startJoinRoomCodeInput" type="text" placeholder="AB12CD" maxlength="6" autocomplete="off">
+      </label>
+
+      <div class="modal-actions">
+        <button class="main-button" id="startJoinConfirmButton" type="button">Присоединиться</button>
+        <button class="ghost-button" type="button" data-start-modal-close>Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="page app-container" id="appContainer" hidden>
     <header class="top-header">
       <div class="title-block">
         <h1>Генератор паков для игры Бункер</h1>
@@ -29,7 +140,7 @@
           <span aria-hidden="true">👤</span>
           <span>Роль</span>
         </button>
-        <button class="top-action-button" id="votingButton" type="button" aria-haspopup="dialog">
+        <button class="top-action-button" id="votingButton" type="button" aria-haspopup="dialog" hidden>
           <span aria-hidden="true">✓</span>
           <span>Голосование</span>
         </button>
@@ -243,7 +354,7 @@
       <div class="voting-results" id="votingResults" aria-live="polite" hidden></div>
       <div class="modal-actions">
         <button class="main-button" id="votingFinishButton" type="button">Начать</button>
-        <button class="ghost-button" id="votingResetButton" type="button">Пропустить</button>
+        <button class="ghost-button" id="votingResetButton" type="button">Завершить</button>
       </div>
     </div>
   </div>
@@ -327,5 +438,18 @@
   <script src="data.js"></script>
   <script src="script.js"></script>
   <script type="module" src="/core/engine.js"></script>
+  <script>
+    /* Pause/resume start video with screen visibility */
+    (function () {
+      const vid = document.querySelector('.start-video');
+      if (!vid) return;
+      const screen = document.getElementById('startScreen');
+      if (!screen) return;
+      const obs = new MutationObserver(function () {
+        if (screen.hidden) { vid.pause(); } else { vid.play().catch(function(){}); }
+      });
+      obs.observe(screen, { attributes: true, attributeFilter: ['hidden'] });
+    })();
+  </script>
 </body>
 </html>

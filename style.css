@@ -24,6 +24,98 @@
   --reveal-glow-strong: rgba(210, 225, 242, 0.42);
 }
 
+.start-screen {
+  position: relative;
+  z-index: 2;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.start-screen[hidden] {
+  display: none;
+}
+
+.start-panel {
+  width: min(100%, 420px);
+  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
+    rgba(8, 10, 13, 0.86);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.055),
+    0 22px 70px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.start-panel h1 {
+  margin: 6px 0 20px;
+  color: rgba(245, 245, 247, 0.96);
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 820;
+  letter-spacing: 0;
+}
+
+.start-actions {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.start-actions .main-button,
+.start-actions .secondary-button {
+  width: 100%;
+  min-height: 42px;
+}
+
+.start-menu-modal {
+  position: relative;
+  width: min(100%, 430px);
+}
+
+.start-menu-modal .field {
+  margin-top: 10px;
+}
+
+.start-menu-modal .modal-actions {
+  margin-top: 16px;
+}
+
+.start-status {
+  min-height: 18px;
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.start-status[data-type="error"] {
+  color: var(--red);
+}
+
+.start-test-button {
+  display: block;
+  margin: 18px auto 0;
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(245, 245, 247, 0.52);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.start-test-button:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.065);
+  color: rgba(245, 245, 247, 0.78);
+}
+
 .title-block h1 {
   margin: 0 0 8px;
   font-size: 28px;
@@ -367,33 +459,181 @@
   opacity: 0.5;
 }
 
-.players-table:not(.abilities-table) th:first-child,
-.players-table:not(.abilities-table) td:first-child {
+.abilities-panel-wrap {
+  padding-top: 4px;
+  overflow-x: visible;
+}
+
+.abilities-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.ability-player-card {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--accent) 14%, transparent), transparent 52%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.032)),
+    rgba(8, 9, 12, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.055),
+    0 0 18px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.ability-player-card.own-ability-card {
+  border-color: color-mix(in srgb, var(--accent) 38%, rgba(255, 255, 255, 0.08));
+}
+
+.ability-player-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 9px;
+}
+
+.ability-player-number {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 24%, rgba(255, 255, 255, 0.08));
+  color: rgba(245, 245, 247, 0.92);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ability-player-header h3 {
+  min-width: 0;
+  margin: 0;
+  color: rgba(245, 245, 247, 0.92);
+  font-size: 13px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.ability-player-list {
+  display: grid;
+  gap: 7px;
+}
+
+.ability-panel-row {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ability-panel-label {
+  color: rgba(245, 245, 247, 0.48);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.ability-panel-button {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.055)),
+    rgba(255, 255, 255, 0.045);
+  color: rgba(245, 245, 247, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  text-align: left;
+}
+
+.ability-panel-button:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--accent) 42%, rgba(255, 255, 255, 0.14));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.075)),
+    color-mix(in srgb, var(--accent) 10%, rgba(255, 255, 255, 0.055));
+}
+
+.ability-panel-button:disabled {
+  cursor: default;
+}
+
+.ability-panel-button.locked,
+.ability-panel-button.used {
+  border-color: rgba(255, 255, 255, 0.065);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02)),
+    rgba(0, 0, 0, 0.24);
+  color: rgba(245, 245, 247, 0.46);
+}
+
+.ability-panel-button.used {
+  color: rgba(245, 245, 247, 0.62);
+}
+
+.ability-panel-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  color: rgba(245, 245, 247, 0.7);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.ability-panel-name {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.ability-panel-button::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  z-index: 8;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  width: min(220px, calc(100vw - 32px));
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 8px;
+  background: rgba(18, 18, 20, 0.96);
+  box-shadow: var(--shadow-soft);
+  color: rgba(245, 245, 247, 0.9);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  text-align: center;
+  transform: translate(-50%, 6px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+  white-space: normal;
+}
+
+.ability-panel-button:hover::after,
+.ability-panel-button:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.players-table thead th:first-child {
   position: sticky;
   left: 0;
+  z-index: 4;
   background: rgba(24, 24, 27, 0.96);
-  box-shadow:
-    1px 0 0 rgba(255, 255, 255, 0.085),
-    12px 0 20px rgba(0, 0, 0, 0.18);
-}
-
-.players-table:not(.abilities-table) th:first-child {
-  z-index: 5;
   text-align: center;
-}
-
-.players-table:not(.abilities-table) td:first-child {
-  z-index: 2;
-}
-
-.players-table:not(.abilities-table) tbody tr:nth-child(even) > td:first-child {
-  background: rgba(28, 28, 31, 0.98);
-}
-
-.players-table:not(.abilities-table) tbody tr.own-row > td:first-child {
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--accent) 18%, transparent), rgba(24, 24, 27, 0.96) 72%),
-    rgba(24, 24, 27, 0.96);
 }
 
 .players-table-number {
@@ -417,15 +657,6 @@
   gap: 5px;
   min-width: 0;
   overflow: hidden;
-}
-
-.players-table-slot.has-avatar {
-  grid-template-columns: 34px minmax(0, 1fr);
-  align-items: center;
-}
-
-.players-table-slot.has-avatar .players-table-host-actions {
-  grid-column: 1 / -1;
 }
 
 .players-table-player-main {
@@ -736,50 +967,6 @@
   opacity: 0.96;
 }
 
-.player-avatar {
-  position: relative;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-}
-
-.portrait.player-avatar {
-  display: grid;
-  object-fit: initial;
-}
-
-.player-avatar-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.player-avatar-placeholder {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  height: 100%;
-  background:
-    radial-gradient(circle at 50% 34%, color-mix(in srgb, var(--accent) 32%, transparent) 0 18%, transparent 19%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.02)),
-    rgba(13, 15, 19, 0.92);
-  color: rgba(245, 245, 247, 0.62);
-  font-size: 22px;
-  font-weight: 800;
-}
-
-.player-avatar-table {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: rgba(10, 12, 16, 0.92);
-}
-
-.player-avatar-table .player-avatar-placeholder {
-  font-size: 15px;
-}
-
 .card-body {
   padding: 11px 12px 12px;
 }
@@ -796,6 +983,49 @@
   text-align: left;
   text-transform: none;
   white-space: nowrap;
+}
+
+.theme-fantasy .character-card .card-body {
+  padding-top: 52px;
+}
+
+.character-card .character-avatar-wrap {
+  width: 112px;
+  height: 148px;
+  margin: 10px auto 14px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at top, rgba(190, 140, 255, 0.22), rgba(20, 14, 35, 0.72)),
+    rgba(255, 255, 255, 0.06);
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.24),
+    0 0 22px rgba(155, 92, 255, 0.18);
+}
+
+.character-card .character-avatar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 4px;
+  object-fit: contain;
+  object-position: center center;
+}
+
+.character-card .character-avatar-placeholder,
+.character-card .character-avatar-missing {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 34px;
+  font-weight: 800;
+}
+
+.character-card .character-avatar-missing::before {
+  content: "?";
 }
 
 .stats {
@@ -871,25 +1101,8 @@
   line-height: 1.35;
 }
 
-.trait-value-stacked {
-  display: grid;
-  gap: 1px;
-}
-
 .character-card .trait-value {
   overflow-wrap: normal;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.character-card .trait-value-stacked {
-  overflow: hidden;
-  white-space: normal;
-}
-
-.character-card .trait-value-stacked span {
-  min-width: 0;
-  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1637,19 +1850,1468 @@
   .title-block h1 {
       font-size: 32px;
     }
-  
+
     .title-block p {
       font-size: 14px;
     }
-  
+
     .stats > .trait-row {
       grid-template-columns: 1fr auto;
     }
-  
+
+    .theme-fantasy .character-card .card-body {
+      padding-top: 48px;
+    }
+
+    .character-card .character-avatar-wrap {
+      width: 88px;
+      height: 116px;
+      margin: 8px auto 12px;
+      border-radius: 16px;
+    }
+
+    .character-card .character-avatar {
+      padding: 3px;
+    }
+
     .players-table th,
     .players-table td {
       padding: 7px 5px;
       font-size: 10px;
     }
-  
+
+}
+
+/* ================================================================
+   PREMIUM UI — glassmorphism · gradients · glow · motion
+   Appended last; uses CSS cascade to layer over base rules.
+   ================================================================ */
+
+/* — Extended design tokens — */
+:root {
+  --reveal-glow: rgba(180, 205, 228, 0.44);
+  --reveal-glow-strong: rgba(215, 228, 245, 0.6);
+  --glass-blur: 26px;
+  --glass-border: rgba(255, 255, 255, 0.16);
+}
+
+/* ——— Background atmosphere — subtle blue vignette ——— */
+body::before {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(55, 80, 170, 0.16) 0%, transparent 62%),
+    rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+/* ——— Title — gradient text ——— */
+.title-block h1 {
+  background: linear-gradient(
+    135deg,
+    #ffffff 15%,
+    rgba(195, 218, 255, 0.92) 55%,
+    rgba(215, 195, 255, 0.82) 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 30px rgba(150, 185, 255, 0.24));
+}
+
+/* ——— Eyebrow labels — cool blue tint ——— */
+.eyebrow {
+  color: rgba(148, 184, 255, 0.72);
+  letter-spacing: 1.1px;
+}
+
+/* =====  BUTTONS  ===== */
+
+.top-action-button {
+  background: rgba(8, 10, 17, 0.72);
+  border-color: rgba(255, 255, 255, 0.13);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.top-action-button:hover {
+  border-color: rgba(158, 192, 255, 0.38);
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow:
+    0 0 0 1px rgba(158, 192, 255, 0.14),
+    0 0 24px rgba(118, 158, 255, 0.18),
+    0 10px 30px rgba(0, 0, 0, 0.4);
+  transform: translateY(-2px);
+}
+
+.main-button {
+  background: linear-gradient(155deg, #f8f8fa 0%, #e6e6ed 100%);
+  border-color: rgba(255, 255, 255, 0.78);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.22),
+    0 6px 22px rgba(255, 255, 255, 0.13),
+    0 16px 40px rgba(0, 0, 0, 0.38);
+}
+
+.main-button:hover {
+  background: linear-gradient(155deg, #ffffff 0%, #ededf4 100%);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.38),
+    0 0 34px rgba(255, 255, 255, 0.2),
+    0 20px 48px rgba(0, 0, 0, 0.46);
+  transform: translateY(-2px);
+}
+
+.secondary-button:hover,
+.ghost-button:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 22px rgba(255, 255, 255, 0.06);
+}
+
+.role-button {
+  background:
+    linear-gradient(170deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.03) 100%),
+    rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.role-button:hover,
+.role-button.active {
+  border-color: rgba(148, 184, 255, 0.44);
+  background:
+    linear-gradient(170deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.07) 100%),
+    rgba(118, 154, 255, 0.13);
+  box-shadow:
+    0 0 0 1px rgba(148, 184, 255, 0.2),
+    0 0 28px rgba(118, 154, 255, 0.2),
+    0 8px 26px rgba(0, 0, 0, 0.34);
+  transform: translateY(-2px);
+}
+
+.trait-mini-action {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.065);
+}
+
+.trait-mini-action:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.34);
+}
+
+/* =====  PANELS — glassmorphism  ===== */
+
+.overview-panel.info-panel {
+  border-color: var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.018) 100%),
+    rgba(7, 9, 14, 0.76);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.055),
+    0 0 52px rgba(88, 128, 210, 0.1),
+    0 30px 72px rgba(0, 0, 0, 0.52);
+}
+
+.game-log-panel.info-panel {
+  border-color: var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+
+.pack-summary {
+  border-color: rgba(255, 255, 255, 0.15);
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.077) 0%, rgba(255, 255, 255, 0.028) 70%),
+    rgba(7, 9, 14, 0.76);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* =====  TABLE  ===== */
+
+.players-table-wrap,
+.table-container {
+  border-color: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.078) 0%, rgba(255, 255, 255, 0.018) 100%),
+    rgba(5, 7, 12, 0.82);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 0 52px rgba(88, 128, 210, 0.09),
+    0 30px 72px rgba(0, 0, 0, 0.52);
+}
+
+.players-table thead th {
+  background: linear-gradient(180deg, rgba(28, 31, 40, 0.99) 0%, rgba(18, 20, 29, 0.99) 100%);
+  color: rgba(195, 212, 238, 0.84);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  letter-spacing: 0.5px;
+  font-size: 10.5px;
+}
+
+.players-table thead th:first-child {
+  background: linear-gradient(180deg, rgba(28, 31, 40, 0.99) 0%, rgba(18, 20, 29, 0.99) 100%);
+}
+
+.players-table-number {
+  background: rgba(20, 22, 31, 0.98);
+}
+
+/* =====  CHARACTER CARDS  ===== */
+
+.character-card {
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.character-card::before {
+  height: 2px;
+  opacity: 0.9;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent) 22%,
+    color-mix(in srgb, var(--accent) 52%, #ffffff) 50%,
+    var(--accent) 78%,
+    transparent 100%
+  );
+}
+
+.character-card:hover {
+  transform: translateY(-8px) scale(1.012);
+  border-color: color-mix(in srgb, var(--accent) 56%, rgba(255, 255, 255, 0.24));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 68%, transparent),
+    0 0 38px color-mix(in srgb, var(--accent) 48%, transparent),
+    0 38px 84px rgba(0, 0, 0, 0.58);
+}
+
+.number-badge {
+  background: rgba(0, 0, 0, 0.58);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 4px 16px rgba(0, 0, 0, 0.44);
+}
+
+.own-card-badge {
+  background: rgba(0, 0, 0, 0.64);
+  border-color: rgba(255, 255, 255, 0.26);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* =====  ABILITY CARDS  ===== */
+
+.ability-player-card {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-color: rgba(255, 255, 255, 0.11);
+  transition: transform 0.24s ease, box-shadow 0.24s ease, border-color 0.24s ease;
+}
+
+.ability-player-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--accent) 48%, rgba(255, 255, 255, 0.18));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 30px color-mix(in srgb, var(--accent) 24%, transparent),
+    0 18px 44px rgba(0, 0, 0, 0.38);
+}
+
+.ability-player-number {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.ability-panel-button:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 20px color-mix(in srgb, var(--accent) 24%, transparent),
+    0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* =====  MODALS — deep glass  ===== */
+
+.confirm-modal {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 100%),
+    rgba(7, 9, 15, 0.92);
+  border-color: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 0 68px rgba(80, 120, 220, 0.14),
+    0 40px 92px rgba(0, 0, 0, 0.66);
+}
+
+.voting-modal {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 100%),
+    rgba(7, 9, 15, 0.92);
+  border-color: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 0 68px rgba(80, 120, 220, 0.14),
+    0 40px 92px rgba(0, 0, 0, 0.66);
+}
+
+.setup-modal {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 100%),
+    rgba(7, 9, 15, 0.92);
+  border-color: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 0 68px rgba(80, 120, 220, 0.14),
+    0 40px 92px rgba(0, 0, 0, 0.66);
+}
+
+.help-panel {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 100%),
+    rgba(7, 9, 15, 0.92);
+  border-color: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 0 68px rgba(80, 120, 220, 0.14),
+    0 40px 92px rgba(0, 0, 0, 0.66);
+}
+
+/* =====  VIEW TOGGLE  ===== */
+
+.view-toggle {
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.view-toggle-button.active {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 0 20px rgba(148, 184, 255, 0.14);
+}
+
+/* =====  GAME LOG ENTRIES  ===== */
+
+.game-log-list li {
+  border-color: rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.046);
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.game-log-list li:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* =====  VOTING TIMER — glowing display  ===== */
+
+.voting-timer {
+  border-color: rgba(255, 255, 255, 0.22);
+  background:
+    radial-gradient(circle at 50% 15%, rgba(148, 184, 255, 0.26), transparent 68%),
+    rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 0 22px rgba(148, 184, 255, 0.14),
+    0 0 28px rgba(148, 184, 255, 0.18);
+  text-shadow: 0 0 24px rgba(160, 198, 255, 0.58);
+}
+
+/* =====  VISIBILITY BADGES  ===== */
+
+.visibility-badge.private {
+  background: rgba(100, 148, 255, 0.14);
+  border-color: rgba(100, 148, 255, 0.32);
+}
+
+.visibility-badge.public {
+  background: rgba(100, 218, 148, 0.1);
+  border-color: rgba(100, 218, 148, 0.3);
+}
+
+/* =====  SURVIVAL SCORE  ===== */
+
+.survival-score {
+  border-color: rgba(200, 222, 255, 0.28);
+  background:
+    radial-gradient(circle at 50% 20%, rgba(148, 184, 255, 0.24), transparent 66%),
+    rgba(255, 255, 255, 0.05);
+  box-shadow:
+    inset 0 0 30px rgba(148, 184, 255, 0.12),
+    0 0 30px rgba(148, 184, 255, 0.18);
+}
+
+.survival-score strong {
+  text-shadow: 0 0 30px rgba(160, 198, 255, 0.54);
+}
+
+/* =====  SCROLLBARS  ===== */
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* =====  TEXT SELECTION  ===== */
+
+::selection {
+  background: rgba(128, 164, 255, 0.36);
+  color: #ffffff;
+}
+
+/* =====  FOCUS RINGS  ===== */
+
+select:focus,
+input:focus,
+button:focus-visible {
+  outline: 2px solid rgba(148, 184, 255, 0.54);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px rgba(120, 158, 255, 0.14);
+}
+
+/* ================================================================
+   AAA GAME UI — sci-fi bunker dark theme
+   Aggressive pass: terminal panels, game buttons, glow systems.
+   ================================================================ */
+
+/* ——— HEADER — floating command console ——— */
+
+.top-header {
+  padding: 14px 28px;
+  margin-bottom: 32px;
+  border: 1px solid rgba(140, 180, 255, 0.15);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075) 0%, rgba(255, 255, 255, 0.02) 100%),
+    rgba(4, 6, 12, 0.88);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.055),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    0 24px 64px rgba(0, 0, 0, 0.72),
+    0 0 80px rgba(70, 110, 240, 0.08);
+}
+
+/* Button emoji icons — glow treatment */
+.top-action-button span[aria-hidden="true"] {
+  font-size: 14px;
+  filter: drop-shadow(0 0 5px rgba(148, 184, 255, 0.55));
+  transition: filter 0.2s ease;
+}
+
+.top-action-button:hover span[aria-hidden="true"] {
+  filter: drop-shadow(0 0 9px rgba(148, 184, 255, 0.95));
+}
+
+/* Game-UI button style */
+.top-action-button {
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+  border-radius: 10px;
+  border-color: rgba(140, 180, 255, 0.2);
+  background: rgba(10, 14, 26, 0.82);
+  padding: 0 14px;
+  gap: 8px;
+}
+
+.top-action-button:hover {
+  border-color: rgba(148, 184, 255, 0.5);
+  background: rgba(25, 48, 116, 0.38);
+  box-shadow:
+    0 0 0 1px rgba(148, 184, 255, 0.2),
+    0 0 26px rgba(100, 150, 255, 0.28),
+    inset 0 0 26px rgba(100, 150, 255, 0.05),
+    0 8px 28px rgba(0, 0, 0, 0.4);
+  transform: translateY(-2px);
+  color: #fff;
+}
+
+/* ——— HUD section heading ——— */
+
+.pack-heading {
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(148, 184, 255, 0.12);
+  margin-bottom: 2px;
+}
+
+.pack-heading h2 {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.4px;
+  background: linear-gradient(135deg, #ffffff 20%, rgba(188, 214, 255, 0.88) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ——— TABLE — data terminal ——— */
+
+/* Per-row depth gradient */
+.players-table tbody tr {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.022) 0%, rgba(0, 0, 0, 0) 100%);
+}
+
+.players-table tbody tr:nth-child(even) {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.036) 0%, rgba(255, 255, 255, 0.016) 100%);
+}
+
+/* Row hover — blue glow sweep */
+.players-table tr.row-hover > th,
+.players-table tr.row-hover > td {
+  box-shadow:
+    inset 0 0 0 999px rgba(70, 125, 255, 0.11),
+    inset 0 1px 0 rgba(148, 184, 255, 0.22),
+    inset 0 -1px 0 rgba(148, 184, 255, 0.08);
+  color: rgba(255, 255, 255, 0.96);
+}
+
+/* Own player row — highlighted track */
+.players-table tbody tr.own-row > td,
+.players-table tbody tr.own-row > th {
+  background:
+    linear-gradient(90deg, rgba(70, 125, 255, 0.15) 0%, rgba(70, 125, 255, 0.04) 55%, transparent 100%);
+  border-bottom-color: rgba(148, 184, 255, 0.16);
+}
+
+/* Column hover — stronger blue */
+.players-table th.column-hover,
+.players-table td.column-hover {
+  box-shadow:
+    inset 0 0 0 999px rgba(110, 155, 255, 0.13),
+    inset 0 0 0 1px rgba(148, 184, 255, 0.22),
+    0 0 22px rgba(100, 150, 255, 0.08);
+  color: rgba(255, 255, 255, 0.98);
+}
+
+/* Sci-fi terminal headers */
+.players-table thead th {
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-size: 10px;
+  font-weight: 900;
+  color: rgba(148, 184, 255, 0.72);
+  border-bottom: 2px solid rgba(148, 184, 255, 0.2);
+}
+
+/* Badge wrapper for cell content */
+.players-table-cell .trait-signal {
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.034);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  min-width: 0;
+}
+
+/* Player name — bold white */
+.players-table-player-name {
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.1px;
+}
+
+/* Number column — accent glow */
+.players-table-number {
+  font-size: 14px;
+  font-weight: 900;
+  text-shadow: 0 0 18px color-mix(in srgb, var(--accent, #8ab4ff) 70%, transparent);
+}
+
+/* ——— ABILITY CARDS — game panels ——— */
+
+.abilities-panel {
+  gap: 14px;
+}
+
+.ability-player-card {
+  position: relative;
+  overflow: hidden;
+  padding: 14px;
+  border-color: color-mix(in srgb, var(--accent, #8ab4ff) 34%, rgba(255, 255, 255, 0.1));
+  border-radius: 14px;
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--accent, rgba(100, 150, 255, 1)) 22%, transparent) 0%,
+      color-mix(in srgb, var(--accent, rgba(100, 150, 255, 1)) 6%, transparent) 45%,
+      transparent 100%
+    ),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.02) 100%),
+    rgba(6, 8, 16, 0.84);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    0 0 0 1px color-mix(in srgb, var(--accent, #8ab4ff) 18%, transparent),
+    0 0 34px color-mix(in srgb, var(--accent, #8ab4ff) 16%, transparent),
+    0 20px 52px rgba(0, 0, 0, 0.5);
+  transition: transform 0.26s ease, box-shadow 0.26s ease, border-color 0.26s ease;
+}
+
+/* Accent shimmer bar at card top */
+.ability-player-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: 14px 14px 0 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent, #8ab4ff) 90%, #ffffff) 35%,
+    color-mix(in srgb, var(--accent, #8ab4ff) 55%, #ffffff) 55%,
+    transparent 100%
+  );
+  opacity: 0.88;
+  pointer-events: none;
+}
+
+.ability-player-card:hover {
+  transform: translateY(-4px);
+  border-color: color-mix(in srgb, var(--accent, #8ab4ff) 55%, rgba(255, 255, 255, 0.2));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0 0 1px color-mix(in srgb, var(--accent, #8ab4ff) 38%, transparent),
+    0 0 50px color-mix(in srgb, var(--accent, #8ab4ff) 30%, transparent),
+    0 30px 68px rgba(0, 0, 0, 0.58);
+}
+
+/* Card header with divider */
+.ability-player-header {
+  padding-bottom: 10px;
+  margin-bottom: 11px;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent, #8ab4ff) 22%, rgba(255, 255, 255, 0.06));
+}
+
+.ability-player-header h3 {
+  font-size: 13px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.96);
+  text-shadow: 0 0 16px color-mix(in srgb, var(--accent, #8ab4ff) 40%, transparent);
+}
+
+/* Player number badge — glowing circle */
+.ability-player-number {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+  font-weight: 900;
+  border: 1px solid color-mix(in srgb, var(--accent, #8ab4ff) 52%, rgba(255, 255, 255, 0.15));
+  background: color-mix(in srgb, var(--accent, #6496ff) 30%, rgba(0, 0, 0, 0.4));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent, #8ab4ff) 24%, transparent),
+    0 0 14px color-mix(in srgb, var(--accent, #8ab4ff) 36%, transparent);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--accent, #8ab4ff) 80%, transparent);
+}
+
+/* Ability type label */
+.ability-panel-label {
+  color: color-mix(in srgb, var(--accent, #8ab4ff) 68%, rgba(255, 255, 255, 0.4));
+  font-size: 9.5px;
+  font-weight: 900;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  display: block;
+}
+
+/* Game-UI button */
+.ability-panel-button {
+  min-height: 40px;
+  padding: 9px 12px;
+  border-color: rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.04) 100%),
+    rgba(255, 255, 255, 0.035);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 4px 14px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.ability-panel-button:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--accent, #8ab4ff) 52%, rgba(255, 255, 255, 0.2));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.08) 100%),
+    color-mix(in srgb, var(--accent, rgba(100, 150, 255, 1)) 12%, rgba(255, 255, 255, 0.04));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 0 18px color-mix(in srgb, var(--accent, #8ab4ff) 26%, transparent),
+    0 6px 20px rgba(0, 0, 0, 0.38);
+  transform: translateY(-2px);
+}
+
+/* Physical press */
+.ability-panel-button:not(:disabled):active {
+  transform: translateY(1px) scale(0.98);
+  box-shadow:
+    inset 0 2px 8px rgba(0, 0, 0, 0.3),
+    0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Used state — dimmed out */
+.ability-panel-button.used {
+  border-color: rgba(255, 255, 255, 0.05);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(0, 0, 0, 0.12) 100%),
+    rgba(0, 0, 0, 0.14);
+  box-shadow: none;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* Locked state */
+.ability-panel-button.locked {
+  border-color: rgba(255, 255, 255, 0.055);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(0, 0, 0, 0.14) 100%),
+    rgba(0, 0, 0, 0.18);
+  box-shadow: none;
+  color: rgba(255, 255, 255, 0.26);
+}
+
+/* Ability icon — accent glow */
+.ability-panel-icon {
+  font-size: 14px;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent, #8ab4ff) 60%, transparent));
+}
+
+/* Ability use buttons (inside cards / table cells) */
+.ability-use-button {
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.06) 100%),
+    rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.ability-use-button:not(:disabled):hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.1) 100%),
+    rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 0 16px rgba(148, 184, 255, 0.2);
+}
+
+.ability-use-button:not(:disabled):active {
+  transform: scale(0.97) translateY(1px);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.28);
+}
+
+/* ——— OVERVIEW COLUMNS — terminal data panels ——— */
+
+.overview-column {
+  position: relative;
+}
+
+.overview-column::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(148, 184, 255, 0.3) 50%, transparent 100%);
+  pointer-events: none;
+}
+
+/* Profession label — stronger glow */
+.profession {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.1px;
+  text-shadow: 0 0 22px color-mix(in srgb, var(--accent, #8ab4ff) 55%, transparent);
+}
+
+/* Stat labels — uppercase terminal style */
+.stats dt {
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ——— GAME LOG — terminal output ——— */
+
+.game-log-header h3 {
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: rgba(148, 184, 255, 0.74);
+}
+
+.game-log-header::after {
+  background: linear-gradient(90deg, rgba(148, 184, 255, 0.28), transparent);
+}
+
+.game-log-list li::before {
+  background: color-mix(in srgb, var(--accent, rgba(148, 184, 255, 1)) 66%, rgba(190, 205, 225, 0.72));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent, rgba(148, 184, 255, 1)) 50%, transparent);
+}
+
+/* ——— MAIN BUTTON — shine sweep on hover ——— */
+
+.main-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.main-button::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 55%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), transparent);
+  transform: skewX(-18deg);
+  transition: left 0.52s ease;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.main-button:hover::before {
+  left: 160%;
+}
+
+/* ——— STATUS BAR — terminal inline bar ——— */
+
+.status-message:not(:empty) {
+  min-height: 34px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+/* ——— VOTING — candidates and results ——— */
+
+.voting-candidate-toggle,
+.voting-candidate-card {
+  border-color: rgba(255, 255, 255, 0.09);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.02) 100%),
+    rgba(255, 255, 255, 0.035);
+  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.voting-candidate-toggle:hover,
+.voting-candidate-card:hover {
+  border-color: rgba(148, 184, 255, 0.28);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.04) 100%),
+    rgba(148, 184, 255, 0.06);
+  box-shadow: 0 0 20px rgba(100, 150, 255, 0.1);
+}
+
+.voting-result-row {
+  border-radius: 10px;
+  transition: background 0.18s ease;
+}
+
+.voting-result-row.winner {
+  border-color: rgba(148, 184, 255, 0.3);
+  background:
+    linear-gradient(90deg, rgba(100, 150, 255, 0.16), rgba(100, 150, 255, 0.06)),
+    rgba(255, 255, 255, 0.04);
+  box-shadow:
+    0 0 0 1px rgba(148, 184, 255, 0.2),
+    0 0 24px rgba(100, 150, 255, 0.18);
+  color: #fff;
+}
+
+/* ——— CONFIRM MODAL — stronger heading ——— */
+
+.confirm-modal h3 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+}
+
+/* ================================================================
+   START SCREEN — game main menu (full override)
+   ================================================================ */
+
+/* Fullscreen container */
+.start-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0;
+  background: #000;
+}
+
+.start-screen[hidden] {
+  display: none;
+}
+
+.start-flow-modal {
+  z-index: 130;
+}
+
+/* Video background — fills container, sits at the very bottom of the stack */
+.start-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  pointer-events: none;
+  user-select: none;
+  display: block;
+}
+
+/* Overlay — above video, below menu */
+.start-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+/* Centered menu column — above overlay */
+.start-menu {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 560px;
+  padding: 48px 28px 72px;
+}
+
+/* ——— LOGO ——— */
+
+.start-logo {
+  margin-bottom: 72px;
+  text-align: center;
+}
+
+.start-logo-sub {
+  margin: 0 0 6px;
+  color: rgba(210, 75, 55, 0.9);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  text-shadow: 0 0 20px rgba(220, 60, 40, 0.45);
+}
+
+.start-logo-title {
+  margin: 0;
+  font-size: clamp(72px, 14vw, 118px);
+  font-weight: 900;
+  line-height: 0.88;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  /* Metallic worn gradient */
+  background: linear-gradient(
+    180deg,
+    #f0ece4 0%,
+    #ccc7be 28%,
+    #a8a39a 58%,
+    #7e7a72 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter:
+    drop-shadow(0 0 40px rgba(215, 65, 45, 0.42))
+    drop-shadow(0 0 100px rgba(180, 40, 20, 0.18));
+}
+
+/* ——— MENU BUTTONS ——— */
+
+.start-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  margin: 0;
+}
+
+/* Reset inherited rules that size .main-button / .secondary-button */
+.start-actions .main-button,
+.start-actions .secondary-button {
+  all: unset;
+}
+
+/* Metal panel game button */
+.start-menu-button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  width: 100%;
+  min-height: 70px;
+  padding: 0 36px;
+  overflow: hidden;
+  cursor: pointer;
+
+  /* Metal dark base */
+  border: 1px solid rgba(215, 195, 170, 0.22);
+  border-radius: 6px;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(58, 52, 46, 0.9) 0%,
+      rgba(36, 31, 27, 0.94) 55%,
+      rgba(24, 20, 17, 0.96) 100%
+    );
+
+  /* Metal edge sheen */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 240, 218, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(0, 0, 0, 0.45),
+    0 6px 32px rgba(0, 0, 0, 0.65);
+
+  color: rgba(238, 228, 212, 0.9);
+  font: 800 17px / 1 inherit;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition:
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.22s ease,
+    background 0.22s ease,
+    border-color 0.22s ease,
+    color 0.22s ease;
+}
+
+/* Rivet dots — left & right */
+.start-menu-button::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 16px 50%, rgba(255, 255, 255, 0.07) 3.5px, transparent 3.5px),
+    radial-gradient(circle at calc(100% - 16px) 50%, rgba(255, 255, 255, 0.07) 3.5px, transparent 3.5px);
+  pointer-events: none;
+}
+
+/* Shine sweep */
+.start-menu-button::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 240, 210, 0.07), transparent);
+  transform: skewX(-18deg);
+  transition: left 0.58s ease;
+  pointer-events: none;
+}
+
+.start-menu-button:hover::after {
+  left: 165%;
+}
+
+/* Create button hover — warm amber glow */
+.start-menu-button:hover {
+  border-color: rgba(210, 155, 100, 0.52);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(82, 62, 44, 0.92) 0%,
+      rgba(54, 40, 28, 0.96) 55%,
+      rgba(38, 28, 18, 0.98) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 235, 200, 0.24),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(185, 100, 50, 0.22),
+    0 0 32px rgba(205, 105, 55, 0.32),
+    0 0 70px rgba(190, 80, 35, 0.14),
+    0 10px 40px rgba(0, 0, 0, 0.7);
+  color: rgba(255, 246, 232, 1);
+  transform: translateY(-3px) scale(1.006);
+}
+
+/* Press */
+.start-menu-button:active {
+  transform: translateY(1px) scale(0.997);
+  box-shadow:
+    inset 0 3px 10px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 235, 200, 0.1),
+    0 2px 14px rgba(0, 0, 0, 0.6);
+  transition-duration: 0.07s;
+}
+
+/* Join button — cool blue-steel tint */
+.start-menu-button--join {
+  border-color: rgba(140, 178, 220, 0.2);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(32, 42, 58, 0.9) 0%,
+      rgba(20, 28, 42, 0.94) 55%,
+      rgba(14, 20, 32, 0.96) 100%
+    );
+}
+
+.start-menu-button--join:hover {
+  border-color: rgba(115, 162, 220, 0.5);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(42, 58, 85, 0.92) 0%,
+      rgba(28, 42, 65, 0.96) 55%,
+      rgba(20, 30, 50, 0.98) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(180, 212, 255, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(75, 130, 205, 0.2),
+    0 0 32px rgba(80, 145, 225, 0.3),
+    0 0 70px rgba(60, 120, 205, 0.12),
+    0 10px 40px rgba(0, 0, 0, 0.7);
+}
+
+/* SVG icon inside button */
+.start-btn-icon {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  opacity: 0.78;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.start-menu-button:hover .start-btn-icon {
+  opacity: 1;
+  transform: scale(1.12);
+}
+
+/* ——— STATUS ——— */
+
+.start-status {
+  min-height: 20px;
+  margin: 18px 0 0;
+  color: rgba(255, 200, 160, 0.88);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  text-align: center;
+}
+
+.start-status[data-type="error"] {
+  color: rgba(255, 140, 110, 0.95);
+}
+
+/* ——— QUICK TEST (low-visibility) ——— */
+
+.start-test-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 28px;
+  padding: 7px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.32);
+  color: rgba(255, 255, 255, 0.38);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+  cursor: pointer;
+}
+
+.start-test-button:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.start-test-button:active {
+  transform: scale(0.97);
+}
+
+/* Suppress old .start-panel rules — no longer used in DOM */
+.start-panel {
+  display: none;
+}
+
+/* Mobile adjustments */
+@media (max-width: 540px) {
+  .start-logo {
+    margin-bottom: 48px;
+  }
+
+  .start-menu-button {
+    min-height: 60px;
+    font-size: 15px;
+    letter-spacing: 0.1em;
+    gap: 14px;
+    padding: 0 24px;
+  }
+
+  .start-menu {
+    padding: 36px 16px 56px;
+  }
+}
+
+/* ================================================================
+   TABLE LAYOUT — responsive full-width, no horizontal scroll
+   Overrides the hardcoded 2020px minimum width.
+   12 columns: player + 11 trait columns (specialAbility excluded).
+   ================================================================ */
+
+/* Outer wrapper: allow thin scroll only on very small screens */
+.players-table-wrap,
+.table-container {
+  overflow-x: auto;
+  overflow-y: visible;
+  padding: 12px;
+}
+
+/* Inner wrapper: same — let the table decide */
+.table-wrapper {
+  overflow-x: visible;
+  overflow-y: visible;
+}
+
+/* Table: fill the container, fixed layout distributes percentages exactly */
+.players-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+/* Cells: compact padding, full word-wrap, no min-width forcing overflow */
+.players-table th,
+.players-table td {
+  padding: 5px 6px;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+  overflow: hidden;
+  vertical-align: top;
+}
+
+/* ── Percentage column widths (12 cols, total = 100%) ── */
+/* player(12) + gender(6) + bodyType(6.5) + trait(7) + age(5) +
+   profession(8.5) + health(13) + hobby(7.5) + phobia(7.5) +
+   largeInventory(7.5) + backpack(7.5) + additionalInfo(12) = 100% */
+.players-table-player-col         { width: 12%;  }
+.players-table-gender-col         { width: 6%;   }
+.players-table-bodyType-col       { width: 6.5%; }
+.players-table-trait-col          { width: 7%;   }
+.players-table-age-col            { width: 5%;   }
+.players-table-profession-col     { width: 8.5%; }
+.players-table-health-col         { width: 13%;  }
+.players-table-hobby-col          { width: 7.5%; }
+.players-table-phobia-col         { width: 7.5%; }
+.players-table-largeInventory-col { width: 7.5%; }
+.players-table-backpack-col       { width: 7.5%; }
+.players-table-additionalInfo-col { width: 12%;  }
+
+/* ── Content inside cells ── */
+
+/* Remove the 150px flex-basis that forces cell expansion */
+.players-table-cell .trait-signal {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.players-table-cell .health-value {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Trait values: 3-line clamp, wrap */
+.players-table-cell .trait-value {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  white-space: normal;
+  max-width: 100%;
+}
+
+/* Stacked variant: same clamping */
+.players-table-cell .trait-value-stacked {
+  overflow: hidden;
+}
+
+.players-table-cell .trait-value-stacked span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Ability label: 2-line clamp */
+.players-table-cell .ability-label {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal;
+  font-size: 10px;
+  max-width: 100%;
+}
+
+/* Player name: 2-line clamp */
+.players-table-player-name {
+  font-size: 12px;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Status/visibility badges: truncate, don't expand */
+.players-table-slot-status {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.players-table-cell .visibility-badge {
+  max-width: 100%;
+}
+
+/* Ability use button: small font in table */
+.players-table-cell .ability-use-button {
+  font-size: 9px;
+  min-height: 22px;
+  padding: 0 5px;
+  white-space: nowrap;
+}
+
+/* Allow scroll on screens narrower than ~900px — 12 readable columns
+   need at least this width to be usable */
+@media (max-width: 900px) {
+  .players-table {
+    min-width: 700px;
+  }
+
+  .players-table-wrap,
+  .table-container,
+  .table-wrapper {
+    overflow-x: auto;
+  }
+}
+
+/* Player accent consistency: table rows reuse the same --accent as ability cards. */
+.players-table tbody tr > td {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent, #8ab4ff) 11%, transparent), transparent 72%),
+    rgba(255, 255, 255, 0.018);
+}
+
+.players-table tbody tr:nth-child(even) > td {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent, #8ab4ff) 13%, transparent), transparent 72%),
+    rgba(255, 255, 255, 0.028);
+}
+
+.players-table tbody tr > .players-table-player {
+  border-left: 3px solid color-mix(in srgb, var(--accent, #8ab4ff) 76%, rgba(255, 255, 255, 0.12));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent, #8ab4ff) 22%, transparent), transparent 82%),
+    rgba(18, 20, 25, 0.88);
+  box-shadow:
+    inset 1px 0 0 color-mix(in srgb, var(--accent, #8ab4ff) 46%, transparent),
+    0 0 16px color-mix(in srgb, var(--accent, #8ab4ff) 10%, transparent);
+}
+
+.players-table tbody tr.own-row > td,
+.players-table tbody tr.own-row > th {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent, #8ab4ff) 24%, transparent), transparent 74%),
+    rgba(255, 255, 255, 0.042);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--accent, #8ab4ff) 18%, transparent),
+    0 0 22px color-mix(in srgb, var(--accent, #8ab4ff) 12%, transparent);
+}
+
+.players-table tbody tr.own-row > .players-table-player {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent, #8ab4ff) 34%, transparent), transparent 82%),
+    rgba(20, 22, 28, 0.92);
+  box-shadow:
+    inset 2px 0 0 color-mix(in srgb, var(--accent, #8ab4ff) 78%, transparent),
+    0 0 24px color-mix(in srgb, var(--accent, #8ab4ff) 20%, transparent);
+}
+
+.players-table tr.row-hover > td {
+  box-shadow:
+    inset 0 0 0 999px color-mix(in srgb, var(--accent, #8ab4ff) 10%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--accent, #8ab4ff) 20%, transparent),
+    0 0 18px color-mix(in srgb, var(--accent, #8ab4ff) 12%, transparent);
 }
