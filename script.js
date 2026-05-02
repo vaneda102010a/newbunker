@@ -500,7 +500,7 @@ function updateControlAvailability() {
     document.querySelectorAll('[data-action]').forEach((btn) => {
       try {
         const action = btn.dataset.action;
-        if (action === 'use-ability' || action === 'use-basic-ability') {
+        if (action === 'use-ability') {
           // abilities are allowed even out of turn
           btn.disabled = false;
         } else {
@@ -1839,7 +1839,7 @@ function renderAbilityPanelRow(playerNumber, ability) {
   const canUse = canUseAbility(playerNumber);
   const isDisabled = ability.used || !canUse;
   const actionAttrs = !isDisabled
-    ? `data-action="use-basic-ability" data-player="${playerNumber}" data-ability-index="${ability.index}"`
+    ? `data-action="use-ability" data-player="${playerNumber}" data-ability-index="${ability.index}"`
     : "";
   const tooltip = ability.used ? "Уже использовано" : ability.name;
 
@@ -2542,43 +2542,13 @@ function getRemainingPlayers() {
   return currentPack.players.filter((player) => !excludedPlayers.has(player.number));
 }
 
-function requestBasicAbilityUse(playerNumber, abilityIndex) {
-  const player = getPlayerByNumber(playerNumber);
-  const ability = getPlayerAbilityItems(player)[abilityIndex];
-
-  if (!ability?.name || ability.used || !canUseAbility(playerNumber)) {
-    return;
-  }
-
-  showConfirm(
-    "Использовать способность?",
-    ability.name,
-    () => markBasicAbilityUsed(playerNumber, abilityIndex),
-    { confirmLabel: "Да", cancelLabel: "Нет" }
-  );
-}
-
-function markBasicAbilityUsed(playerNumber, abilityIndex) {
-  const player = getPlayerByNumber(playerNumber);
-  const ability = getPlayerAbilityItems(player)[abilityIndex];
-
-  if (!ability?.name || ability.used || !canUseAbility(playerNumber)) {
-    return;
-  }
-
-  usedAbilities[ability.id] = true;
-  addGameLog(`Игрок ${playerNumber} использовал способность: ${ability.name}`);
-  renderPack(currentPack);
-  renderGameLog();
-}
-
 function openAbilityModal(playerNumber, abilityIndex) {
   if (!canUseAbility(playerNumber)) {
     return;
   }
 
   const player = getPlayerByNumber(playerNumber);
-  const abilityText = getPlayerAbilities(player)[abilityIndex];
+  const abilityText = getPlayerAbilityItems(player)[abilityIndex]?.name;
 
   if (!player || !abilityText) {
     return;
@@ -3717,21 +3687,12 @@ characterGrid.addEventListener("click", (event) => {
 
   const playerNumber = Number(button.dataset.player);
 
-  if (button.dataset.action === "use-basic-ability") {
-    if (button.disabled) {
-      return;
-    }
-
-    requestBasicAbilityUse(playerNumber, Number(button.dataset.abilityIndex));
-    return;
-  }
-
   if (button.dataset.action === "use-ability") {
     if (button.disabled) {
       return;
     }
 
-    if (isTouchTooltipMode() && !button.classList.contains("tooltip-open")) {
+    if (button.classList.contains("ability-use-button") && isTouchTooltipMode() && !button.classList.contains("tooltip-open")) {
       closeActiveAbilityTooltips(button);
       button.classList.add("tooltip-open");
       return;
