@@ -200,7 +200,6 @@ let cardDatabase = createEmptyCardDatabase();
 let currentPack = null;
 let excludedPlayers = new Set();
 let revealedTraits = {};
-let localRevealedTraits = {};
 let newlyRevealedTraitKeys = new Set();
 let confirmAction = null;
 let usedAbilities = {};
@@ -678,13 +677,7 @@ function isOnlineRoom() {
 }
 
 function canRevealTrait(playerNumber) {
-  // Only the active player can use reveal buttons for their slot.
-  // Host has separate controls and should not use per-player reveal buttons.
-  if (currentLobby && currentLobby.isGameStarted) {
-    return isCharacterActive(playerNumber) && isOwnPlayer(playerNumber);
-  }
-
-  return isHostView() || isOwnPlayer(playerNumber);
+  return isOwnPlayer(playerNumber);
 }
 
 function canUseAbility(playerNumber) {
@@ -774,9 +767,11 @@ function updateControlAvailability() {
     document.querySelectorAll('[data-action]').forEach((btn) => {
       try {
         const action = btn.dataset.action;
-        if (action === 'use-ability' || action === 'reveal-trait-local') {
-          // abilities and local-only reveals are allowed even out of turn
+        if (action === 'use-ability') {
+          // abilities are allowed even out of turn
           btn.disabled = false;
+        } else if (action === 'reveal-trait') {
+          btn.disabled = !canRevealTrait(Number(btn.dataset.player));
         } else {
           btn.disabled = !isMyTurn;
         }
@@ -1954,7 +1949,7 @@ function renderTraitValue(character, trait, options = {}) {
 }
 
 function canViewTrait(playerNumber, traitKey) {
-  return isOwnPlayer(playerNumber) || isTraitRevealed(playerNumber, traitKey) || isTraitRevealedLocally(playerNumber, traitKey);
+  return isOwnPlayer(playerNumber) || isTraitRevealed(playerNumber, traitKey);
 }
 
 function renderHiddenTraitValue(playerNumber, trait) {
@@ -1962,26 +1957,21 @@ function renderHiddenTraitValue(playerNumber, trait) {
     return renderHostHiddenTraitControls(playerNumber, trait);
   }
 
-  const lockAction = renderLockButton(playerNumber, trait.key, trait.label);
-
   return `
     <div class="trait-value-box hidden-player-controls">
       <div class="trait-value-line">
-        <span class="trait-row-actions">${lockAction}</span>
       </div>
     </div>
   `;
 }
 
 function renderHostHiddenTraitControls(playerNumber, trait) {
-  const localRevealAction = renderLockButton(playerNumber, trait.key, trait.label);
-  const revealAction = renderTraitRevealAction(playerNumber, trait.key, trait.label);
   const rerollAction = renderTraitRerollAction(playerNumber, trait.key, trait.label);
 
   return `
     <div class="trait-value-box hidden-host-controls">
       <div class="trait-value-line">
-        <span class="trait-row-actions">${localRevealAction}${revealAction}${rerollAction}</span>
+        <span class="trait-row-actions">${rerollAction}</span>
       </div>
     </div>
   `;
@@ -2020,22 +2010,18 @@ function renderVisibleTraitValue(character, trait, isPublic, options = {}) {
         ${value}
         <span class="trait-row-actions">${revealAction}${rerollAction}</span>
       </div>
-      ${renderVisibilityBadge(character.number, isPublic, trait.key)}
+      ${renderVisibilityBadge(character.number, isPublic)}
     </div>
   `;
 }
 
-function renderVisibilityBadge(playerNumber, isPublic, traitKey = "") {
+function renderVisibilityBadge(playerNumber, isPublic) {
   if (isPublic) {
-    return `<span class="visibility-badge public">Открыто всем</span>`;
+    return "";
   }
 
-  if (isOwnPlayer(playerNumber) || isTraitRevealedLocally(playerNumber, traitKey)) {
+  if (isOwnPlayer(playerNumber)) {
     return `<span class="visibility-badge private">Только вы</span>`;
-  }
-
-  if (isHostView()) {
-    return `<span class="visibility-badge host icon-only" aria-label="Скрыто от игроков" title="Скрыто от игроков">🔒</span>`;
   }
 
   return "";
@@ -2381,16 +2367,16 @@ function getHealthExplanation(health) {
 
 function renderLockButton(playerNumber, traitKey, label, isDisabled = false) {
   return `
-    <button class="trait-lock" type="button" data-action="reveal-trait-local" data-player="${playerNumber}" data-trait="${traitKey}" aria-label="Открыть ${label} только для себя" ${isDisabled ? "disabled" : ""}>
+    <button class="trait-lock" type="button" data-action="reveal-trait" data-player="${playerNumber}" data-trait="${traitKey}" aria-label="Открыть ${label}" ${isDisabled ? "disabled" : ""}>
       🔒
     </button>
   `;
 }
 
 function renderTraitRevealAction(playerNumber, traitKey, label) {
-  const disabled = !(currentLobby && currentLobby.isGameStarted ? isCharacterActive(playerNumber) && isOwnPlayer(playerNumber) : canRevealTrait(playerNumber));
+  const disabled = !canRevealTrait(playerNumber);
   return `
-    <button class="trait-mini-action" type="button" data-action="reveal-trait" data-player="${playerNumber}" data-trait="${traitKey}" aria-label="Открыть ${label} для всех" ${disabled ? "disabled" : ""}>
+    <button class="trait-lock" type="button" data-action="reveal-trait" data-player="${playerNumber}" data-trait="${traitKey}" aria-label="Открыть ${label}" ${disabled ? "disabled" : ""}>
       🔒
     </button>
   `;
@@ -2566,10 +2552,6 @@ function isTraitRevealed(playerNumber, traitKey) {
   return Boolean(revealedTraits[playerNumber]?.[traitKey]);
 }
 
-function isTraitRevealedLocally(playerNumber, traitKey) {
-  return Boolean(localRevealedTraits[playerNumber]?.[traitKey]);
-}
-
 function getTraitRevealKey(playerNumber, traitKey) {
   return `${playerNumber}:${traitKey}`;
 }
@@ -2590,7 +2572,7 @@ function markNewlyRevealedTraits(nextRevealedTraits) {
 
 function revealTrait(playerNumber, traitKey) {
   if (isOnlineRoom()) {
-    socket.emit("actionPerformed", { roomCode: currentRoomCode, action: { type: 'reveal', playerNumber, traitKey } });
+    socket.emit("reveal-trait", { roomCode: currentRoomCode, playerNumber, traitKey });
     return;
   }
 
@@ -2599,25 +2581,6 @@ function revealTrait(playerNumber, traitKey) {
     addGameLog(`Открыта характеристика Игрока ${playerNumber}: ${getTraitAccusative(traitKey)}`);
     renderGameLog();
   }
-  renderPack(currentPack);
-}
-
-function revealTraitLocally(playerNumber, traitKey) {
-  console.log("[trait-local-reveal] click", { playerId: playerNumber, field: traitKey });
-
-  if (!playerNumber || !traitKey) {
-    return;
-  }
-
-  if (!localRevealedTraits[playerNumber]) {
-    localRevealedTraits[playerNumber] = {};
-  }
-
-  if (!localRevealedTraits[playerNumber][traitKey]) {
-    newlyRevealedTraitKeys.add(getTraitRevealKey(playerNumber, traitKey));
-  }
-
-  localRevealedTraits[playerNumber][traitKey] = true;
   renderPack(currentPack);
 }
 
@@ -2813,7 +2776,6 @@ function resetGameState(pack) {
   excludedPlayers = new Set();
   revealedTraits = {};
   usedAbilities = {};
-  localRevealedTraits = {};
   protectedPlayers = new Set();
   gameLog = [];
   pendingAbility = null;
@@ -4008,23 +3970,19 @@ characterGrid.addEventListener("click", (event) => {
     return;
   }
 
-  if (button.dataset.action === "reveal-trait-local") {
-    console.log("[trait-local-reveal] handler fired", {
+  if (button.dataset.action === "reveal-trait") {
+    console.log("[trait-reveal] handler fired", {
       playerId: playerNumber,
       field: button.dataset.trait
     });
-    revealTraitLocally(playerNumber, button.dataset.trait);
-    return;
-  }
 
-  if (button.dataset.action === "reveal-trait") {
     if (!canRevealTrait(playerNumber)) {
       return;
     }
 
     showConfirm(
       "Открытие характеристики",
-      "Открыть эту характеристику для всех?",
+      "Открыть эту характеристику?",
       () => revealTrait(playerNumber, button.dataset.trait)
     );
   }
