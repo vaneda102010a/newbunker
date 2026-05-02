@@ -13,7 +13,6 @@ const PROJECT_ROOT = __dirname;
 const PUBLIC_DIR = path.join(PROJECT_ROOT, "public");
 const THEME_DIR = path.join(PUBLIC_DIR, "themes");
 const DEFAULT_THEME_ID = "classic";
-const VOTING_DURATION_MS = 30000;
 const STATIC_FILES = {
   "/script.js": "script.js",
   "/style.css": "style.css",
@@ -796,21 +795,26 @@ io.on("connection", (socket) => {
     broadcastRoom(room.roomCode);
   });
 
-  socket.on("voting-start", ({ roomCode, candidates } = {}, reply) => {
+  socket.on("voting-start", ({ roomCode } = {}, reply) => {
     const room = getHostRoom(socket, roomCode);
     if (!room) {
       sendReply(reply, { ok: false, error: "Только ведущий может начать голосование" });
       return;
     }
 
-    const validCandidates = normalizeVotingCandidates(room, candidates);
-    if (validCandidates.length < 2) {
-      sendReply(reply, { ok: false, error: "Выберите минимум двух активных игроков" });
+    if (room.voting?.active) {
+      sendReply(reply, { ok: false, error: "Голосование уже активно" });
+      return;
+    }
+
+    const alivePlayers = getAliveVotingPlayers(room);
+    if (alivePlayers.length < 2) {
+      sendReply(reply, { ok: false, error: "Для голосования нужно минимум два живых игрока" });
       return;
     }
 
     clearVotingTimer(room);
-    startVotingRound(room, validCandidates, {
+    startVotingRound(room, alivePlayers, {
       id: createRequestId(),
       round: 1,
       logStart: true
@@ -840,12 +844,26 @@ io.on("connection", (socket) => {
     }
 
     const voterNumber = Number(player.playerNumber);
-    if (room.voting.votes[voterNumber]) {
+    const currentAliveNumbers = new Set(getAliveVotingPlayers(room));
+    if (!currentAliveNumbers.has(candidateNumber)) {
+      sendReply(reply, { ok: false, error: "Кандидат недоступен" });
+      return;
+    }
+
+    if (candidateNumber === voterNumber) {
+      sendReply(reply, { ok: false, error: "Нельзя голосовать за себя" });
+      return;
+    }
+
+    const votesByPlayerId = room.voting.votesByPlayerId || room.voting.votes || {};
+    if (votesByPlayerId[voterNumber]) {
       sendReply(reply, { ok: false, error: "Вы уже проголосовали" });
       return;
     }
 
+    room.voting.votesByPlayerId = room.voting.votesByPlayerId || {};
     room.voting.votes[voterNumber] = candidateNumber;
+    room.voting.votesByPlayerId[String(voterNumber)] = candidateNumber;
     room.gameLog.push(`Игрок ${voterNumber} проголосовал`);
     sendReply(reply, { ok: true });
 
@@ -860,15 +878,17 @@ io.on("connection", (socket) => {
   socket.on("voting-skip", ({ roomCode } = {}, reply) => {
     const room = getHostRoom(socket, roomCode);
     if (!room) {
-      sendReply(reply, { ok: false, error: "Только ведущий может пропустить голосование" });
+      sendReply(reply, { ok: false, error: "Только ведущий может завершить голосование" });
       return;
     }
 
-    clearVotingTimer(room);
-    room.voting = null;
-    room.gameLog.push("Голосование пропущено ведущим");
+    if (!room.voting?.active) {
+      sendReply(reply, { ok: false, error: "Голосование не активно" });
+      return;
+    }
+
+    resolveVotingRound(room.roomCode, "manual");
     sendReply(reply, { ok: true });
-    broadcastRoom(room.roomCode);
   });
 
   socket.on("ability-request", ({ roomCode, context } = {}, reply) => {
@@ -1099,8 +1119,19 @@ function getActiveRoomParticipants(room) {
     .filter((player) => !excluded.has(Number(player.playerNumber)));
 }
 
+function getAliveVotingPlayers(room) {
+  return getActiveRoomParticipants(room).map((player) => Number(player.playerNumber));
+}
+
 function isActiveRoomParticipant(room, player) {
-  return getActiveRoomParticipants(room).some((candidate) => candidate.socketId === player.socketId);
+  const activeNumbers = new Set(
+    (room.voting?.alivePlayers?.length ? room.voting.alivePlayers : getAliveVotingPlayers(room))
+      .map(Number)
+  );
+
+  return getActiveRoomParticipants(room)
+    .filter((candidate) => activeNumbers.has(Number(candidate.playerNumber)))
+    .some((candidate) => candidate.socketId === player.socketId);
 }
 
 function normalizeVotingCandidates(room, candidates) {
@@ -1121,10 +1152,12 @@ function clearVotingTimer(room) {
   }
 }
 
-function startVotingRound(room, candidates, options = {}) {
+function startVotingRound(room, alivePlayers, options = {}) {
   const id = options.id || room.voting?.id || createRequestId();
   const round = Number(options.round) || 1;
   const now = Date.now();
+  const candidates = Array.from(new Set((alivePlayers || []).map(Number).filter(Boolean)));
+  const eliminatedPlayers = (room.excludedPlayers || []).map(Number).filter(Boolean);
 
   room.voting = {
     id,
@@ -1132,21 +1165,22 @@ function startVotingRound(room, candidates, options = {}) {
     active: true,
     status: "active",
     candidates,
+    alivePlayers: candidates,
+    eliminatedPlayers,
     votes: {},
+    votesByPlayerId: {},
     startedAt: now,
-    endsAt: now + VOTING_DURATION_MS,
-    durationMs: VOTING_DURATION_MS,
+    endsAt: null,
+    durationMs: null,
     result: null,
-    message: round > 1 ? `Повторный раунд ${round}` : "Голосование активно"
+    message: "Ожидание голосов..."
   };
 
   if (options.logStart) {
-    room.gameLog.push(`Кандидаты добавлены: ${candidates.map((number) => `Игрок ${number}`).join(", ")}`);
     room.gameLog.push("Голосование началось");
   }
 
   clearVotingTimer(room);
-  room.votingTimer = setTimeout(() => resolveVotingRound(room.roomCode, "timer"), VOTING_DURATION_MS + 100);
 }
 
 function allActiveParticipantsVoted(room) {
@@ -1154,8 +1188,11 @@ function allActiveParticipantsVoted(room) {
     return false;
   }
 
-  const participants = getActiveRoomParticipants(room);
-  return participants.length > 0 && participants.every((player) => room.voting.votes[Number(player.playerNumber)]);
+  const aliveNumbers = new Set((room.voting.alivePlayers || []).map(Number));
+  const participants = getActiveRoomParticipants(room)
+    .filter((player) => aliveNumbers.has(Number(player.playerNumber)));
+  const votes = room.voting.votesByPlayerId || room.voting.votes || {};
+  return participants.length > 0 && participants.every((player) => votes[Number(player.playerNumber)]);
 }
 
 function resolveVotingRound(roomCode, reason = "timer") {
@@ -1167,12 +1204,14 @@ function resolveVotingRound(roomCode, reason = "timer") {
   clearVotingTimer(room);
 
   const voting = room.voting;
-  const counts = voting.candidates.reduce((result, playerNumber) => {
+  const alivePlayers = (voting.alivePlayers?.length ? voting.alivePlayers : voting.candidates).map(Number);
+  const neededVotes = Math.floor(alivePlayers.length / 2) + 1;
+  const counts = alivePlayers.reduce((result, playerNumber) => {
     result[playerNumber] = 0;
     return result;
   }, {});
 
-  Object.values(voting.votes).forEach((candidateNumber) => {
+  Object.values(voting.votesByPlayerId || voting.votes || {}).forEach((candidateNumber) => {
     const number = Number(candidateNumber);
     if (counts[number] !== undefined) {
       counts[number] += 1;
@@ -1180,43 +1219,38 @@ function resolveVotingRound(roomCode, reason = "timer") {
   });
 
   const maxVotes = Math.max(0, ...Object.values(counts));
-  const tied = Object.entries(counts)
-    .filter(([, count]) => count === maxVotes)
-    .map(([playerNumber]) => Number(playerNumber));
+  const winnerEntry = Object.entries(counts)
+    .sort(([, a], [, b]) => b - a)
+    .find(([, count]) => count >= neededVotes);
   const details = Object.entries(counts)
     .map(([playerNumber, count]) => `Игрок ${playerNumber}: ${count}`)
     .join("; ");
 
   room.gameLog.push(`Голосование завершено: ${details || "голосов нет"}`);
 
-  if (maxVotes <= 0) {
+  if (!winnerEntry || maxVotes < neededVotes) {
+    const message = "Никто не набрал 51% голосов.";
+    room.gameLog.push(message);
     room.voting = {
       ...voting,
       active: false,
       status: "ended",
       result: {
-        type: "no-votes",
+        type: "no-majority",
         reason,
         counts,
-        message: "Никто не выбыл: голосов нет"
+        neededVotes,
+        alivePlayers,
+        eliminated: null,
+        message
       },
-      message: "Голосование завершено без голосов"
+      message
     };
     broadcastRoom(room.roomCode);
     return;
   }
 
-  if (tied.length > 1) {
-    room.gameLog.push(`Ничья: ${tied.map((number) => `Игрок ${number}`).join(", ")}. Запущен новый раунд`);
-    startVotingRound(room, tied, {
-      id: voting.id,
-      round: voting.round + 1
-    });
-    broadcastRoom(room.roomCode);
-    return;
-  }
-
-  const eliminated = tied[0];
+  const eliminated = Number(winnerEntry[0]);
   const excluded = new Set((room.excludedPlayers || []).map(Number));
   excluded.add(eliminated);
   room.excludedPlayers = Array.from(excluded);
@@ -1230,6 +1264,8 @@ function resolveVotingRound(roomCode, reason = "timer") {
       type: "eliminated",
       reason,
       counts,
+      neededVotes,
+      alivePlayers,
       eliminated,
       message: `Исключен Игрок ${eliminated}`
     },
@@ -1338,7 +1374,7 @@ function serializeVoting(room) {
     name: player.name || `Игрок ${player.playerNumber}`,
     isHost: Boolean(player.isHost)
   }));
-  const voted = Object.keys(voting.votes || {}).map(Number);
+  const voted = Object.keys(voting.votesByPlayerId || voting.votes || {}).map(Number);
 
   return {
     id: voting.id,
@@ -1350,6 +1386,8 @@ function serializeVoting(room) {
       name: getRoomPlayerLabel(room, number)
     })),
     participants,
+    alivePlayers: (voting.alivePlayers || []).map(Number),
+    eliminatedPlayers: (voting.eliminatedPlayers || room.excludedPlayers || []).map(Number),
     voted,
     startedAt: voting.startedAt,
     endsAt: voting.endsAt,

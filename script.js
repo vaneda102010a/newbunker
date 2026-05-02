@@ -768,6 +768,10 @@ function updateControlAvailability() {
   const hostCanGenerate = cardsAreReady && !themeIsLoading && isHostView();
   generateButton.disabled = !hostCanGenerate;
   randomThemeButton.disabled = !hostCanGenerate;
+  if (votingButton) {
+    votingButton.hidden = !isHostView();
+    votingButton.disabled = !isHostView() || !isOnlineRoom() || !currentPack?.players?.length;
+  }
   if (settingsPanelButton) {
     settingsPanelButton.disabled = !isHostView();
   }
@@ -3727,21 +3731,21 @@ function openVotingModal(resetSetup = false) {
     return;
   }
 
-  if (resetSetup && isHostView() && !votingState?.active) {
-    localVotingCandidates = new Set(getActiveVotingPlayers().map((player) => player.number));
-    votingSetupOpen = true;
+  if (votingState?.active) {
+    votingSetupOpen = false;
     dismissedVotingId = "";
     renderVotingModal();
     votingModal.hidden = false;
     return;
   }
 
-  if (votingState?.active || votingState?.status === "ended") {
-    votingSetupOpen = false;
-    dismissedVotingId = "";
-    renderVotingModal();
-    votingModal.hidden = false;
-    startVotingCountdown();
+  if (votingState?.status === "ended") {
+    if (resetSetup && isHostView() && isOnlineRoom()) {
+      startVotingFromSetup();
+      return;
+    }
+
+    closeVotingModal();
     return;
   }
 
@@ -3755,13 +3759,7 @@ function openVotingModal(resetSetup = false) {
     return;
   }
 
-  if (resetSetup || !localVotingCandidates.size) {
-    localVotingCandidates = new Set(getActiveVotingPlayers().map((player) => player.number));
-  }
-
-  votingSetupOpen = true;
-  renderVotingModal();
-  votingModal.hidden = false;
+  startVotingFromSetup();
 }
 
 function renderVotingModal() {
@@ -3769,27 +3767,9 @@ function renderVotingModal() {
     return;
   }
 
-  const showSetup = votingSetupOpen && isHostView() && !votingState?.active && votingState?.status !== "ended";
-  votingSetup.hidden = !showSetup;
-  votingTimer.hidden = showSetup;
-
-  if (showSetup) {
-    renderVotingSetup();
-    votingList.innerHTML = "";
-    votingParticipants.innerHTML = "";
-    votingResults.hidden = true;
-    votingResults.innerHTML = "";
-    votingStatus.textContent = "Выберите кандидатов из занятых активных слотов.";
-    votingFinishButton.hidden = false;
-    votingFinishButton.textContent = "Начать голосование";
-    votingFinishButton.disabled = localVotingCandidates.size < 2;
-    votingResetButton.hidden = false;
-    votingResetButton.textContent = "Отмена";
-    stopVotingCountdown();
-    updateVotingTimerText(30);
-    return;
-  }
-
+  votingSetupOpen = false;
+  votingSetup.hidden = true;
+  votingTimer.hidden = true;
   votingSetup.innerHTML = "";
 
   if (!votingState) {
@@ -3822,19 +3802,13 @@ function renderVotingModal() {
     votingResults.innerHTML = "";
   }
 
-  votingFinishButton.hidden = isActive || !isHostView();
-  votingFinishButton.textContent = "Новое голосование";
-  votingFinishButton.disabled = false;
+  votingFinishButton.hidden = true;
+  votingFinishButton.disabled = true;
   votingResetButton.hidden = !isHostView() || !isActive;
-  votingResetButton.textContent = "Пропустить голосование";
+  votingResetButton.textContent = "Завершить голосование";
   votingResetButton.disabled = false;
 
-  if (isActive) {
-    startVotingCountdown();
-  } else {
-    stopVotingCountdown();
-    updateVotingTimerText(0);
-  }
+  stopVotingCountdown();
 }
 
 function renderVotingSetup() {
@@ -3863,15 +3837,21 @@ function getVotingStatusText(hasVoted) {
     const votedCount = votingState.voted?.length || 0;
     const total = votingState.participants?.length || 0;
     return hasVoted
-      ? `Голос принят. Проголосовали ${votedCount} из ${total}.`
-      : `Раунд ${votingState.round}. Проголосовали ${votedCount} из ${total}.`;
+      ? `Голос принят. Ожидание голосов... ${votedCount} из ${total}.`
+      : `Ожидание голосов... ${votedCount} из ${total}.`;
   }
 
   return votingState.result?.message || votingState.message || "Голосование завершено.";
 }
 
 function renderVotingCandidateList(canVote, hasVoted) {
-  const candidates = votingState?.candidates || [];
+  const candidates = (votingState?.candidates || [])
+    .filter((candidate) => Number(candidate.number) !== Number(currentPlayerNumber));
+
+  if (!candidates.length) {
+    return `<div class="voting-empty">Нет доступных кандидатов.</div>`;
+  }
+
   return candidates.map((candidate) => `
     <article class="voting-candidate-card">
       <div>
@@ -3879,7 +3859,7 @@ function renderVotingCandidateList(canVote, hasVoted) {
         <span>${escapeHtml(getVotingPlayerLabel(candidate.number) || candidate.name || `Игрок ${candidate.number}`)}</span>
       </div>
       <button class="secondary-button voting-vote-button" type="button" data-vote-candidate="${candidate.number}" ${!canVote ? "disabled" : ""}>
-        ${hasVoted ? "Голос отправлен" : "Голосовать"}
+        ${hasVoted ? "Голос отправлен" : "Проголосовать"}
       </button>
     </article>
   `).join("");
@@ -3905,13 +3885,7 @@ function startVotingFromSetup() {
     return;
   }
 
-  const candidates = Array.from(localVotingCandidates);
-  if (candidates.length < 2) {
-    setStatus("Выберите минимум двух кандидатов.", "error");
-    return;
-  }
-
-  socket.emit("voting-start", { roomCode: currentRoomCode, candidates }, (response) => {
+  socket.emit("voting-start", { roomCode: currentRoomCode }, (response) => {
     if (!response?.ok) {
       setStatus(response?.error || "Не удалось начать голосование.", "error");
       return;
@@ -3961,7 +3935,7 @@ function skipVoting() {
 
   socket.emit("voting-skip", { roomCode: currentRoomCode }, (response) => {
     if (!response?.ok) {
-      setStatus(response?.error || "Не удалось пропустить голосование.", "error");
+      setStatus(response?.error || "Не удалось завершить голосование.", "error");
     }
   });
 }
@@ -3974,14 +3948,20 @@ function renderVotingFromState() {
     return;
   }
 
-  if (votingState.active || (votingState.status === "ended" && dismissedVotingId !== votingState.id)) {
+  if (votingState.status === "ended") {
+    closeVotingModal();
+    return;
+  }
+
+  const participantNumbers = new Set((votingState.participants || []).map((player) => Number(player.number)));
+  if (votingState.active && participantNumbers.has(Number(currentPlayerNumber))) {
     votingSetupOpen = false;
     renderVotingModal();
     votingModal.hidden = false;
     return;
   }
 
-  renderVotingModal();
+  closeVotingModal();
 }
 
 function updateVotingTimerText(seconds) {
@@ -4415,7 +4395,18 @@ helpModal?.addEventListener("click", (event) => {
 settingsPanelButton?.addEventListener("click", () => openSetupModal("gameSettingsModal"));
 roomPanelButton?.addEventListener("click", () => openSetupModal("roomSetupModal"));
 rolePanelButton?.addEventListener("click", () => openSetupModal("roleSetupModal"));
-votingButton?.addEventListener("click", () => openVotingModal(false));
+votingButton?.addEventListener("click", () => {
+  if (!isHostView()) {
+    return;
+  }
+
+  if (votingState?.active) {
+    openVotingModal(false);
+    return;
+  }
+
+  openVotingModal(true);
+});
 survivalButton?.addEventListener("click", handleSurvivalCalculation);
 setupModals.forEach((modal) => {
   modal.addEventListener("click", (event) => {
