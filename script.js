@@ -2130,16 +2130,31 @@ function renderVisibleTraitValue(character, trait, isPublic, options = {}) {
   const rerollAction = isHostView()
     ? renderTraitRerollAction(character.number, trait.key, trait.label)
     : "";
+  const ownStateIndicator = options.view === VIEW_TABLE && isOwnPlayer(character.number)
+    ? renderOwnTraitStateIndicator(isPublic, Boolean(revealAction))
+    : "";
 
   return `
     <div class="trait-value-box${revealClass}">
       <div class="trait-value-line">
         ${value}
-        <span class="trait-row-actions">${revealAction}${rerollAction}</span>
+        <span class="trait-row-actions">${ownStateIndicator}${revealAction}${rerollAction}</span>
       </div>
       ${renderVisibilityBadge(character.number, isPublic)}
     </div>
   `;
+}
+
+function renderOwnTraitStateIndicator(isPublic, revealActionVisible = false) {
+  if (!isPublic && revealActionVisible) {
+    return "";
+  }
+
+  const icon = isPublic ? "✓" : "🔒";
+  const label = isPublic ? "Характеристика открыта" : "Характеристика скрыта";
+  const stateClass = isPublic ? "revealed" : "hidden";
+
+  return `<span class="own-trait-state ${stateClass}" aria-label="${label}" title="${label}">${icon}</span>`;
 }
 
 function renderVisibilityBadge(playerNumber, isPublic) {

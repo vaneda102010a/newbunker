@@ -801,7 +801,8 @@
 }
 
 .players-table-cell .trait-mini-action,
-.players-table-cell .trait-lock {
+.players-table-cell .trait-lock,
+.players-table-cell .own-trait-state {
   width: 20px;
   height: 20px;
   font-size: 10px;
@@ -809,6 +810,28 @@
 
 .players-table-cell .trait-lock {
   margin-left: 0;
+}
+
+.players-table-cell .own-trait-state {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(245, 245, 247, 0.54);
+  line-height: 1;
+  pointer-events: none;
+}
+
+.players-table-cell .own-trait-state.revealed {
+  border-color: rgba(74, 222, 128, 0.22);
+  background: rgba(34, 197, 94, 0.1);
+  color: rgba(134, 239, 172, 0.92);
+}
+
+.players-table-cell .own-trait-state.hidden {
+  color: rgba(245, 245, 247, 0.48);
 }
 
 .players-table-cell .visibility-badge {
