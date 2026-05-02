@@ -140,6 +140,7 @@ const cardViewButton = document.querySelector("#cardViewButton");
 const tableViewButton = document.querySelector("#tableViewButton");
 const survivalButton = document.querySelector("#survivalButton");
 const gameLogList = document.querySelector("#gameLogList");
+const gameLogPanel = gameLogList?.closest(".game-log-panel");
 const helpButton = document.querySelector("#helpButton");
 const settingsPanelButton = document.querySelector("#settingsPanelButton");
 const roomPanelButton = document.querySelector("#roomPanelButton");
@@ -239,13 +240,11 @@ let lastChangedCell = null;
 let isKicked = false;
 let characterView = getSavedCharacterView();
 let pendingCreateRoomName = "";
-let pendingApprovedRequest = null;
 let votingState = null;
 let votingSetupOpen = false;
 let localVotingCandidates = new Set();
 let votingCountdownTimer = null;
 let dismissedVotingId = "";
-const handledAbilityRequests = new Set();
 const cardDatabaseCache = new Map();
 const fallbackThemeEngine = {
   id: DEFAULT_THEME_ID,
@@ -748,6 +747,8 @@ function updateRoleControls() {
   if (!isOnlineRoom()) {
     updatePlayerNumberOptions();
   }
+
+  renderGameLog();
 }
 
 function updatePlayerNumberOptions() {
@@ -852,7 +853,6 @@ function initializeSocket() {
       `?room=${roomCode}`
     );
   });
-  socket.on("ability-approval-request", handleAbilityApprovalRequest);
   socket.on("nextTurn", (data) => {
     try {
       console.log("Next turn:", data);
@@ -1204,64 +1204,26 @@ function renderRoomInfo(room) {
     .join("");
 }
 
-function collectSharedState(resolvedRequestId = "") {
+function collectSharedState() {
   return {
     generatedPack: currentPack,
     revealedTraits,
     excludedPlayers: Array.from(excludedPlayers),
     usedAbilities,
     protectedPlayers: Array.from(protectedPlayers),
-    gameLog,
-    resolvedRequestId
+    gameLog
   };
 }
 
-function syncHostState(resolvedRequestId = "") {
+function syncHostState() {
   if (!isOnlineRoom() || !isHostView()) {
     return;
   }
 
   socket.emit("host-sync-state", {
     roomCode: currentRoomCode,
-    state: collectSharedState(resolvedRequestId)
+    state: collectSharedState()
   });
-}
-
-function handleAbilityApprovalRequest({ roomCode, request }) {
-  if (!isHostView() || roomCode !== currentRoomCode || !request || handledAbilityRequests.has(request.id)) {
-    return;
-  }
-
-  handledAbilityRequests.add(request.id);
-  showConfirm(
-    "Запрос способности",
-    `${request.playerName || `Игрок ${request.actorNumber}`} хочет использовать способность. Подтвердить?`,
-    () => approveAbilityRequest(request)
-  );
-}
-
-function approveAbilityRequest(request) {
-  if (!request?.context || !isHostView()) {
-    return;
-  }
-
-  const context = prepareAbilityContext(request.context);
-  const abilityKey = getAbilityKey(context.actorNumber, context.abilityIndex);
-  const validationError = validateAbilityContext(context);
-
-  if (validationError) {
-    addGameLog(`Запрос способности Игрока ${context.actorNumber} отклонен: ${validationError}`);
-    renderGameLog();
-    syncHostState(request.id);
-    return;
-  }
-
-  usedAbilities[abilityKey] = true;
-  addGameLog(`Ведущий подтвердил способность Игрока ${context.actorNumber}: ${context.abilityText}`);
-  const wasApplied = executeAbility(context);
-  renderPack(currentPack);
-  renderGameLog();
-  syncHostState(request.id);
 }
 
 function createEmptyCardDatabase() {
@@ -2991,9 +2953,7 @@ function openAbilityModal(playerNumber, abilityIndex) {
   abilityPlayerLabel.textContent = `Игрок ${playerNumber} · ${getAbilityTitle(analysis.type)}`;
   abilityTitle.textContent = abilityText;
   abilityDescription.textContent = abilityText;
-  abilityAdminNote.textContent = isOnlineRoom() && !isHostView()
-    ? "Запрос уйдет ведущему на подтверждение"
-    : "";
+  abilityAdminNote.textContent = "";
 
   renderAbilityTargetControls();
   updateAbilityTraitOptions();
@@ -3227,19 +3187,6 @@ function confirmAbilityUse() {
     return;
   }
 
-  if (isOnlineRoom() && !isHostView()) {
-    socket.emit("ability-request", { roomCode: currentRoomCode, context }, (response) => {
-      if (!response?.ok) {
-        setStatus(response?.error || "Не удалось отправить запрос способности.", "error");
-        return;
-      }
-
-      setStatus("Запрос способности отправлен ведущему.", "success");
-    });
-    closeAbilityModal();
-    return;
-  }
-
   usedAbilities[abilityKey] = true;
   addGameLog(`Игрок ${context.actorNumber} использовал способность: ${context.abilityText}`);
 
@@ -3247,12 +3194,28 @@ function confirmAbilityUse() {
   closeAbilityModal();
   renderPack(currentPack);
   renderGameLog();
-  if (isOnlineRoom() && isHostView()) {
-    syncHostState();
+  if (isOnlineRoom()) {
+    syncAbilityState(context);
   }
   if (wasApplied !== false) {
-    setStatus("Способность применена локально.", "success");
+    setStatus("Способность применена.", "success");
   }
+}
+
+function syncAbilityState(context) {
+  if (!socket?.connected || !currentRoomCode) {
+    return;
+  }
+
+  socket.emit("ability-apply", {
+    roomCode: currentRoomCode,
+    context,
+    state: collectSharedState()
+  }, (response) => {
+    if (!response?.ok) {
+      setStatus(response?.error || "Не удалось синхронизировать способность.", "error");
+    }
+  });
 }
 
 function executeAbility(context) {
@@ -4163,6 +4126,14 @@ function addGameLog(message) {
 }
 
 function renderGameLog() {
+  if (gameLogPanel) {
+    gameLogPanel.hidden = !isHostView();
+  }
+
+  if (!isHostView()) {
+    return;
+  }
+
   if (!gameLogList) {
     return;
   }

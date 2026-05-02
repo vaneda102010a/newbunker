@@ -723,7 +723,6 @@ io.on("connection", (socket) => {
     room.excludedPlayers = [];
     room.usedAbilities = {};
     room.protectedPlayers = [];
-    room.pendingAbilityRequests = [];
     clearVotingTimer(room);
     room.voting = null;
     room.gameLog = ["Ведущий сгенерировал новый пак"];
@@ -891,44 +890,44 @@ io.on("connection", (socket) => {
     sendReply(reply, { ok: true });
   });
 
-  socket.on("ability-request", ({ roomCode, context } = {}, reply) => {
+  socket.on("ability-apply", ({ roomCode, context, state } = {}, reply) => {
     const room = rooms.get(normalizeRoomCode(roomCode));
     const player = getRoomPlayer(room, socket.id);
+    const actorNumber = Number(context?.actorNumber);
+    const abilityIndex = Number(context?.abilityIndex);
 
-    if (!room || !player || Number(context?.actorNumber) !== Number(player.playerNumber)) {
+    if (!room || !player || actorNumber !== Number(player.playerNumber)) {
       sendReply(reply, { ok: false, error: "Можно использовать только свои способности" });
       return;
     }
 
-    const abilityKey = `${Number(context.actorNumber)}:${Number(context.abilityIndex)}`;
+    const abilityKey = `${actorNumber}:${abilityIndex}`;
     if (room.usedAbilities?.[abilityKey]) {
       sendReply(reply, { ok: false, error: "Эта способность уже использована" });
       return;
     }
 
-    const request = {
-      id: createRequestId(),
-      socketId: socket.id,
-      playerName: player.name,
-      actorNumber: player.playerNumber,
-      context,
-      createdAt: Date.now()
-    };
-    room.pendingAbilityRequests.push(request);
-    room.gameLog.push(`Игрок ${player.playerNumber} запросил способность`);
-    sendReply(reply, { ok: true, requestId: request.id });
-    broadcastRoom(room.roomCode);
-    io.to(room.hostId).emit("ability-approval-request", { roomCode: room.roomCode, request });
-  });
-
-  socket.on("host-reject-ability", ({ roomCode, requestId } = {}) => {
-    const room = getHostRoom(socket, roomCode);
-    if (!room) {
+    if (!state || typeof state !== "object") {
+      sendReply(reply, { ok: false, error: "Нет состояния способности" });
       return;
     }
 
-    room.pendingAbilityRequests = room.pendingAbilityRequests.filter((request) => request.id !== requestId);
-    room.gameLog.push("Ведущий отклонил запрос способности");
+    const submittedLog = Array.isArray(state.gameLog) ? state.gameLog : null;
+    const stateWithoutLog = { ...state };
+    delete stateWithoutLog.gameLog;
+
+    applySharedState(room, stateWithoutLog);
+    room.usedAbilities = room.usedAbilities || {};
+    room.usedAbilities[abilityKey] = true;
+
+    if (player.isHost && submittedLog) {
+      room.gameLog = submittedLog.slice(-80);
+    } else if (submittedLog?.length) {
+      room.gameLog = [...(room.gameLog || []), ...submittedLog].slice(-80);
+    } else {
+      room.gameLog.push(`Игрок ${actorNumber} использовал способность`);
+    }
+    sendReply(reply, { ok: true });
     broadcastRoom(room.roomCode);
   });
 
@@ -1006,7 +1005,6 @@ function createRoomForSocket(socket, rawPlayerName, reply) {
 
   sendReply(reply, { ok: true, roomCode });
   socket.emit("roomCreated", { roomCode });
-  io.to(roomCode).emit("roomStateUpdated", serializeRoom(room));
   broadcastRoom(roomCode);
   broadcastLobby(roomCode);
 }
@@ -1021,7 +1019,6 @@ function createRoom(roomCode, hostId, hostName) {
     excludedPlayers: [],
     usedAbilities: {},
     protectedPlayers: [],
-    pendingAbilityRequests: [],
     voting: null,
     votingTimer: null,
     gameLog: ["Комната создана"]
@@ -1392,9 +1389,6 @@ function applySharedState(room, state) {
     room.gameLog = state.gameLog.slice(-80);
   }
 
-  if (state.resolvedRequestId) {
-    room.pendingAbilityRequests = room.pendingAbilityRequests.filter((request) => request.id !== state.resolvedRequestId);
-  }
 }
 
 function serializeRoom(room) {
@@ -1407,7 +1401,6 @@ function serializeRoom(room) {
     excludedPlayers: room.excludedPlayers,
     usedAbilities: room.usedAbilities,
     protectedPlayers: room.protectedPlayers,
-    pendingAbilityRequests: room.pendingAbilityRequests,
     voting: serializeVoting(room),
     gameLog: room.gameLog.slice(-80)
   };
@@ -1455,8 +1448,12 @@ function broadcastRoom(roomCode) {
 
   const payload = serializeRoom(room);
   room.players.forEach((player) => {
+    const roomPayload = player.isHost
+      ? payload
+      : { ...payload, gameLog: [] };
+
     io.to(player.socketId).emit("room-state", {
-      room: payload,
+      room: roomPayload,
       currentUser: player,
       publicUrl: PUBLIC_URL
     });
