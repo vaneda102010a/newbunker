@@ -71,6 +71,8 @@ function createOrGetLobby(roomCode) {
       state: "WAITING_LOBBY",
       hostId: null,
       currentTurnIndex: 0,
+      currentTurnPlayerNumber: null,
+      roundNumber: 1,
       isGameStarted: false,
       currentTurnStartedAt: null
     };
@@ -92,15 +94,59 @@ function getLobbyPlayerBySocketId(lobby, socketId) {
   return lobby?.players?.find(p => p.socketId === socketId);
 }
 
-function getCurrentPlayer(lobby) {
-  if (!lobby?.isGameStarted || lobby.players.length === 0) {
+function getLobbyPlayerForRoomPlayer(lobby, roomPlayer) {
+  if (!lobby || !roomPlayer) {
     return null;
   }
-  return lobby.players[lobby.currentTurnIndex % lobby.players.length];
+
+  return lobby.players.find((player) => player.socketId === roomPlayer.socketId) || null;
 }
 
-function serializeLobby(lobby) {
-  const currentPlayer = getCurrentPlayer(lobby);
+function getActiveTurnEntries(lobby, room) {
+  if (!lobby || !room) {
+    return [];
+  }
+
+  return getActiveRoomParticipants(room)
+    .slice()
+    .sort((a, b) => Number(a.playerNumber) - Number(b.playerNumber))
+    .map((roomPlayer) => ({
+      roomPlayer,
+      lobbyPlayer: getLobbyPlayerForRoomPlayer(lobby, roomPlayer),
+      playerNumber: Number(roomPlayer.playerNumber)
+    }));
+}
+
+function getCurrentTurnEntry(lobby, room) {
+  if (!lobby?.isGameStarted) {
+    return null;
+  }
+
+  const activeEntries = getActiveTurnEntries(lobby, room);
+  if (activeEntries.length === 0) {
+    lobby.currentTurnIndex = 0;
+    lobby.currentTurnPlayerNumber = null;
+    return null;
+  }
+
+  let currentIndex = activeEntries.findIndex((entry) => entry.playerNumber === Number(lobby.currentTurnPlayerNumber));
+  if (currentIndex === -1) {
+    currentIndex = 0;
+    lobby.currentTurnPlayerNumber = activeEntries[currentIndex].playerNumber;
+    lobby.currentTurnStartedAt = lobby.currentTurnStartedAt || Date.now();
+  }
+
+  lobby.currentTurnIndex = currentIndex;
+  return activeEntries[currentIndex];
+}
+
+function getCurrentPlayer(lobby, room = rooms.get(normalizeRoomCode(lobby?.roomCode))) {
+  return getCurrentTurnEntry(lobby, room)?.lobbyPlayer || null;
+}
+
+function serializeLobby(lobby, room = rooms.get(normalizeRoomCode(lobby?.roomCode))) {
+  const currentEntry = getCurrentTurnEntry(lobby, room);
+  const roomPlayersBySocket = new Map((room?.players || []).map((player) => [player.socketId, player]));
   
   return {
     id: lobby.id,
@@ -108,15 +154,22 @@ function serializeLobby(lobby) {
     state: lobby.state,
     hostId: lobby.hostId,
     currentTurnIndex: lobby.currentTurnIndex,
+    currentTurnPlayerNumber: currentEntry?.playerNumber || null,
+    roundNumber: lobby.roundNumber || 1,
     isGameStarted: Boolean(lobby.isGameStarted),
     currentTurnStartedAt: lobby.currentTurnStartedAt,
-    currentPlayerId: currentPlayer?.id || null,
+    currentPlayerId: currentEntry?.lobbyPlayer?.id || null,
     players: lobby.players.map(p => ({
       id: p.id,
+      socketId: p.socketId,
       name: p.name,
       isHost: p.isHost,
       isConnected: p.isConnected,
-      hasRevealedThisTurn: p.hasRevealedThisTurn
+      hasRevealedThisTurn: p.hasRevealedThisTurn,
+      playerNumber: Number(roomPlayersBySocket.get(p.socketId)?.playerNumber) || null,
+      isExcluded: roomPlayersBySocket.has(p.socketId)
+        ? (room?.excludedPlayers || []).map(Number).includes(Number(roomPlayersBySocket.get(p.socketId)?.playerNumber))
+        : false
     }))
   };
 }
@@ -129,7 +182,7 @@ function broadcastLobby(roomCode) {
     return;
   }
 
-  const payload = serializeLobby(lobby);
+  const payload = serializeLobby(lobby, room);
   
   room.players.forEach((roomPlayer) => {
     io.to(roomPlayer.socketId).emit("lobby-state-update", {
@@ -139,29 +192,56 @@ function broadcastLobby(roomCode) {
   });
 }
 
-function advanceLobbyTurn(lobby) {
-  if (!lobby || !Array.isArray(lobby.players) || lobby.players.length === 0) return;
+function advanceLobbyTurn(lobby, room = rooms.get(normalizeRoomCode(lobby?.roomCode)), fromPlayerNumber = lobby?.currentTurnPlayerNumber) {
+  if (!lobby || !room || !Array.isArray(lobby.players) || lobby.players.length === 0) return;
 
   // ensure game started
   if (!lobby.isGameStarted) {
     lobby.isGameStarted = true;
   }
 
-  const prevIndex = Number(lobby.currentTurnIndex) || 0;
-  const prevPlayer = lobby.players[prevIndex];
-  if (prevPlayer) {
+  const currentEntry = getCurrentTurnEntry(lobby, room);
+  if (currentEntry?.lobbyPlayer) {
     // reset their reveal flag at end of their turn
-    prevPlayer.hasRevealedThisTurn = false;
+    currentEntry.lobbyPlayer.hasRevealedThisTurn = false;
   }
 
-  // advance
-  const nextIndex = (prevIndex + 1) % lobby.players.length;
+  const activeEntries = getActiveTurnEntries(lobby, room);
+  if (activeEntries.length === 0) {
+    lobby.currentTurnIndex = 0;
+    lobby.currentTurnPlayerNumber = null;
+    return lobby.currentTurnIndex;
+  }
+
+  const previousNumber = Number(fromPlayerNumber || currentEntry?.playerNumber || lobby.currentTurnPlayerNumber);
+  let currentIndex = activeEntries.findIndex((entry) => entry.playerNumber === previousNumber);
+  let nextIndex;
+
+  if (currentIndex === -1) {
+    nextIndex = activeEntries.findIndex((entry) => entry.playerNumber > previousNumber);
+    if (nextIndex === -1) {
+      nextIndex = 0;
+      lobby.roundNumber = (Number(lobby.roundNumber) || 1) + 1;
+    }
+  } else {
+    nextIndex = (currentIndex + 1) % activeEntries.length;
+    if (nextIndex === 0) {
+      lobby.roundNumber = (Number(lobby.roundNumber) || 1) + 1;
+    }
+  }
+
   lobby.currentTurnIndex = nextIndex;
+  lobby.currentTurnPlayerNumber = activeEntries[nextIndex].playerNumber;
   lobby.currentTurnStartedAt = Date.now();
 
   // broadcast nextTurn event to room
   try {
-    const payload = { nextPlayerId: lobby.players[nextIndex]?.id || null, nextPlayerIndex: nextIndex };
+    const payload = {
+      nextPlayerId: activeEntries[nextIndex]?.lobbyPlayer?.id || null,
+      nextPlayerIndex: nextIndex,
+      nextPlayerNumber: activeEntries[nextIndex]?.playerNumber || null,
+      roundNumber: lobby.roundNumber || 1
+    };
     io.to(lobby.roomCode).emit("nextTurn", payload);
     io.to(lobby.roomCode).emit("updateTurn", payload);
     io.to(lobby.roomCode).emit("turnChanged", payload);
@@ -255,6 +335,17 @@ io.on("connection", (socket) => {
     }
     
     const cleanedName = cleanName(playerName) || `Игрок ${lobby.players.length + 1}`;
+
+    const existingLobbyPlayer = getLobbyPlayerBySocketId(lobby, socket.id);
+    if (existingLobbyPlayer) {
+      existingLobbyPlayer.name = cleanedName || existingLobbyPlayer.name;
+      existingLobbyPlayer.isConnected = true;
+      socket.join(normalizedCode);
+      sendReply(reply, { ok: true, playerId: existingLobbyPlayer.id, roomCode: normalizedCode });
+      broadcastLobby(normalizedCode);
+      broadcastRoom(normalizedCode);
+      return;
+    }
     
     // Create new player for lobby
     const playerId = createPlayerId();
@@ -317,8 +408,9 @@ io.on("connection", (socket) => {
   socket.on("start-game", ({ roomCode } = {}, reply) => {
     const normalizedCode = normalizeRoomCode(roomCode);
     const lobby = getLobbyByRoomCode(normalizedCode);
+    const room = rooms.get(normalizedCode);
     
-    if (!lobby) {
+    if (!lobby || !room) {
       sendReply(reply, { ok: false, error: "Лобби не найдено" });
       return;
     }
@@ -330,7 +422,8 @@ io.on("connection", (socket) => {
       return;
     }
     
-    if (lobby.players.length < 2) {
+    const activeEntries = getActiveTurnEntries(lobby, room);
+    if (activeEntries.length < 2) {
       sendReply(reply, { ok: false, error: "Нужно минимум 2 игрока" });
       return;
     }
@@ -339,6 +432,8 @@ io.on("connection", (socket) => {
     lobby.state = "IN_GAME";
     lobby.isGameStarted = true;
     lobby.currentTurnIndex = 0;
+    lobby.currentTurnPlayerNumber = activeEntries[0].playerNumber;
+    lobby.roundNumber = 1;
     lobby.currentTurnStartedAt = Date.now();
 
     // Reset turn flags
@@ -351,15 +446,21 @@ io.on("connection", (socket) => {
     sendReply(reply, { ok: true });
     broadcastLobby(normalizedCode);
     // notify nextTurn
-    const next = getCurrentPlayer(lobby);
-    io.to(normalizedCode).emit("nextTurn", { nextPlayerId: next?.id || null, nextPlayerIndex: lobby.currentTurnIndex });
+    const next = getCurrentTurnEntry(lobby, room);
+    io.to(normalizedCode).emit("nextTurn", {
+      nextPlayerId: next?.lobbyPlayer?.id || null,
+      nextPlayerIndex: lobby.currentTurnIndex,
+      nextPlayerNumber: next?.playerNumber || null,
+      roundNumber: lobby.roundNumber
+    });
   });
   
   socket.on("kick-player", ({ roomCode, playerId } = {}, reply) => {
     const normalizedCode = normalizeRoomCode(roomCode);
     const lobby = getLobbyByRoomCode(normalizedCode);
+    const room = rooms.get(normalizedCode);
     
-    if (!lobby) {
+    if (!lobby || !room) {
       sendReply(reply, { ok: false, error: "Лобби не найдено" });
       return;
     }
@@ -385,18 +486,14 @@ io.on("connection", (socket) => {
 
     // Also remove from room.players if present
     const roomObj = rooms.get(normalizeRoomCode(normalizedCode));
+    const removedRoomPlayer = roomObj?.players?.find((rp) => rp.socketId === playerToKick.socketId) || null;
     if (roomObj) {
       roomObj.players = roomObj.players.filter(rp => rp.socketId !== playerToKick.socketId);
     }
 
     // If removed player was current, advance turn
-    if (lobby.isGameStarted && removedPlayer) {
-      // if removedIndex is the current index, advance; otherwise adjust index
-      if (removedIndex === lobby.currentTurnIndex) {
-        advanceLobbyTurn(lobby);
-      } else if (removedIndex < lobby.currentTurnIndex) {
-        lobby.currentTurnIndex = Math.max(0, lobby.currentTurnIndex - 1);
-      }
+    if (lobby.isGameStarted && removedPlayer && roomObj) {
+      advanceLobbyTurn(lobby, roomObj, Number(removedRoomPlayer?.playerNumber) || lobby.currentTurnPlayerNumber);
     }
     
     console.log(`Player ${playerToKick.name} (${playerId}) was kicked from lobby ${normalizedCode}`);
@@ -443,21 +540,18 @@ io.on("connection", (socket) => {
     }
 
     // Remove player from lobby and room
-    const removedIndex = lobby.players.findIndex(p => p.id === playerId);
+    const removedIndex = lobby.players.findIndex(p => p.id === playerToKick.id);
     const removedPlayer = removedIndex !== -1 ? lobby.players[removedIndex] : null;
-    lobby.players = lobby.players.filter(p => p.id !== playerId);
+    lobby.players = lobby.players.filter(p => p.id !== playerToKick.id);
     const roomObj = rooms.get(normalizeRoomCode(normalizedCode));
+    const removedRoomPlayer = roomObj?.players?.find((rp) => rp.socketId === playerToKick.socketId) || null;
     if (roomObj) {
       roomObj.players = roomObj.players.filter(rp => rp.socketId !== playerToKick.socketId);
       roomObj.gameLog.push(`${playerToKick.name} был исключён ведущим`);
     }
 
-    if (lobby.isGameStarted && removedPlayer) {
-      if (removedIndex === lobby.currentTurnIndex) {
-        advanceLobbyTurn(lobby);
-      } else if (removedIndex < lobby.currentTurnIndex) {
-        lobby.currentTurnIndex = Math.max(0, lobby.currentTurnIndex - 1);
-      }
+    if (lobby.isGameStarted && removedPlayer && roomObj) {
+      advanceLobbyTurn(lobby, roomObj, Number(removedRoomPlayer?.playerNumber) || lobby.currentTurnPlayerNumber);
     }
 
     sendReply(reply, { ok: true });
@@ -512,19 +606,19 @@ io.on("connection", (socket) => {
     }
 
     const player = getLobbyPlayerBySocketId(lobby, socket.id);
-    const currentPlayer = getCurrentPlayer(lobby);
+    const currentEntry = getCurrentTurnEntry(lobby, room);
 
     if (!player) {
       sendReply(reply, { ok: false, error: 'Игрок не найден' });
       return;
     }
 
-    if (!currentPlayer) {
+    if (!currentEntry) {
       sendReply(reply, { ok: false, error: 'Текущий игрок не определен' });
       return;
     }
 
-    if (player.id !== currentPlayer.id) {
+    if (player.id !== currentEntry.lobbyPlayer?.id) {
       sendReply(reply, { ok: false, error: 'Это не ваша очередь' });
       return;
     }
@@ -538,18 +632,29 @@ io.on("connection", (socket) => {
         return;
       }
 
+      if (playerNumber !== currentEntry.playerNumber) {
+        sendReply(reply, { ok: false, error: 'Можно открывать только свою характеристику' });
+        return;
+      }
+
       // mark at room level (shared state)
       setTraitRevealed(room, playerNumber, traitKey);
       room.gameLog = room.gameLog || [];
-      room.gameLog.push(`Игрок ${player.playerNumber || player.name} открыл ${getTraitAccusative(traitKey)} Игрока ${playerNumber}`);
+      room.gameLog.push(`Игрок ${playerNumber} открыл ${getTraitAccusative(traitKey)}`);
 
       // advance turn
-      advanceLobbyTurn(lobby);
+      advanceLobbyTurn(lobby, room, playerNumber);
 
       // broadcast updates
       broadcastRoom(normalizedCode);
       broadcastLobby(normalizedCode);
-      io.to(normalizedCode).emit('turnChanged', { nextPlayerIndex: lobby.currentTurnIndex, nextPlayerId: lobby.players[lobby.currentTurnIndex]?.id || null });
+      const next = getCurrentTurnEntry(lobby, room);
+      io.to(normalizedCode).emit('turnChanged', {
+        nextPlayerIndex: lobby.currentTurnIndex,
+        nextPlayerId: next?.lobbyPlayer?.id || null,
+        nextPlayerNumber: next?.playerNumber || null,
+        roundNumber: lobby.roundNumber || 1
+      });
 
       sendReply(reply, { ok: true });
       return;
@@ -573,20 +678,20 @@ io.on("connection", (socket) => {
     }
     
     const player = getLobbyPlayerBySocketId(lobby, socket.id);
-    const currentPlayer = getCurrentPlayer(lobby);
+    const currentEntry = getCurrentTurnEntry(lobby, room);
     
     if (!player) {
       sendReply(reply, { ok: false, error: "Игрок не найден" });
       return;
     }
     
-    if (!currentPlayer) {
+    if (!currentEntry) {
       sendReply(reply, { ok: false, error: "Текущий игрок не определен" });
       return;
     }
     
     // Only current player can reveal
-    if (player.id !== currentPlayer.id) {
+    if (player.id !== currentEntry.lobbyPlayer?.id) {
       sendReply(reply, { ok: false, error: "Это не ваша очередь" });
       return;
     }
@@ -603,7 +708,7 @@ io.on("connection", (socket) => {
     console.log(`Player ${player.name} revealed characteristic: ${characteristicKey}`);
 
     // After revealing, automatically end the turn and advance
-    advanceLobbyTurn(lobby);
+    advanceLobbyTurn(lobby, room, currentEntry.playerNumber);
 
     sendReply(reply, { ok: true });
     broadcastLobby(normalizedCode);
@@ -612,8 +717,9 @@ io.on("connection", (socket) => {
   socket.on("end-turn", ({ roomCode } = {}, reply) => {
     const normalizedCode = normalizeRoomCode(roomCode);
     const lobby = getLobbyByRoomCode(normalizedCode);
+    const room = rooms.get(normalizedCode);
     
-    if (!lobby) {
+    if (!lobby || !room) {
       sendReply(reply, { ok: false, error: "Лобби не найдено" });
       return;
     }
@@ -624,28 +730,28 @@ io.on("connection", (socket) => {
     }
     
     const player = getLobbyPlayerBySocketId(lobby, socket.id);
-    const currentPlayer = getCurrentPlayer(lobby);
+    const currentEntry = getCurrentTurnEntry(lobby, room);
     
     if (!player) {
       sendReply(reply, { ok: false, error: "Игрок не найден" });
       return;
     }
     
-    if (!currentPlayer) {
+    if (!currentEntry) {
       sendReply(reply, { ok: false, error: "Текущий игрок не определен" });
       return;
     }
     
     // Only current player or host can end turn
-    if (player.id !== currentPlayer.id && !player.isHost) {
+    if (player.id !== currentEntry.lobbyPlayer?.id && !player.isHost) {
       sendReply(reply, { ok: false, error: "Это не ваша очередь" });
       return;
     }
     
     // Use shared advance logic
-    advanceLobbyTurn(lobby);
+    advanceLobbyTurn(lobby, room, currentEntry.playerNumber);
 
-    console.log(`Turn ended in lobby ${normalizedCode}. Next player: ${lobby.players[lobby.currentTurnIndex]?.name}`);
+    console.log(`Turn ended in lobby ${normalizedCode}. Next player: ${lobby.currentTurnPlayerNumber}`);
 
     sendReply(reply, { ok: true });
     broadcastLobby(normalizedCode);
@@ -696,15 +802,17 @@ io.on("connection", (socket) => {
     
     // Also add to lobby
     const lobby = createOrGetLobby(normalizedCode);
-    const playerId = createPlayerId();
-    lobby.players.push({
-      id: playerId,
-      socketId: socket.id,
-      name: playerName,
-      isHost: false,
-      isConnected: true,
-      hasRevealedThisTurn: false
-    });
+    if (!getLobbyPlayerBySocketId(lobby, socket.id)) {
+      const playerId = createPlayerId();
+      lobby.players.push({
+        id: playerId,
+        socketId: socket.id,
+        name: playerName,
+        isHost: false,
+        isConnected: true,
+        hasRevealedThisTurn: false
+      });
+    }
     
     socket.join(normalizedCode);
     sendReply(reply, { ok: true, roomCode: normalizedCode });
@@ -727,25 +835,70 @@ io.on("connection", (socket) => {
     room.voting = null;
     room.gameLog = ["Ведущий сгенерировал новый пак"];
     reconcilePlayerSlots(room);
+    const lobby = getLobbyByRoomCode(room.roomCode);
+    if (lobby) {
+      lobby.currentTurnIndex = 0;
+      lobby.currentTurnPlayerNumber = null;
+      lobby.roundNumber = 1;
+      lobby.currentTurnStartedAt = null;
+      lobby.players.forEach((player) => {
+        player.hasRevealedThisTurn = false;
+      });
+    }
     broadcastRoom(room.roomCode);
+    broadcastLobby(room.roomCode);
   });
 
-  socket.on("reveal-trait", ({ roomCode, playerNumber, traitKey } = {}) => {
-    const room = rooms.get(normalizeRoomCode(roomCode));
+  socket.on("reveal-trait", ({ roomCode, playerNumber, traitKey } = {}, reply) => {
+    const normalizedCode = normalizeRoomCode(roomCode);
+    const room = rooms.get(normalizedCode);
     const player = getRoomPlayer(room, socket.id);
+    const lobby = getLobbyByRoomCode(normalizedCode);
 
-    if (!room || !player || !canReveal(player, Number(playerNumber))) {
+    if (!room || !player || !traitKey) {
+      sendReply(reply, { ok: false, error: "Нельзя открыть характеристику" });
       return;
     }
 
-    setTraitRevealed(room, Number(playerNumber), traitKey);
-    room.gameLog.push(`Открыта характеристика Игрока ${Number(playerNumber)}: ${getTraitAccusative(traitKey)}`);
+    const requestedPlayerNumber = Number(playerNumber);
+
+    if (lobby?.isGameStarted) {
+      const currentEntry = getCurrentTurnEntry(lobby, room);
+      if (
+        !currentEntry ||
+        currentEntry.roomPlayer.socketId !== socket.id ||
+        requestedPlayerNumber !== currentEntry.playerNumber ||
+        requestedPlayerNumber !== Number(player.playerNumber) ||
+        (room.excludedPlayers || []).map(Number).includes(requestedPlayerNumber)
+      ) {
+        sendReply(reply, { ok: false, error: "Сейчас ход другого игрока" });
+        return;
+      }
+    } else if (!canReveal(player, requestedPlayerNumber)) {
+      sendReply(reply, { ok: false, error: "Нельзя открыть эту характеристику" });
+      return;
+    }
+
+    setTraitRevealed(room, requestedPlayerNumber, traitKey);
+    room.gameLog.push(`Открыта характеристика Игрока ${requestedPlayerNumber}: ${getTraitAccusative(traitKey)}`);
+
+    if (lobby?.isGameStarted) {
+      advanceLobbyTurn(lobby, room, requestedPlayerNumber);
+      broadcastLobby(room.roomCode);
+    }
+
+    sendReply(reply, { ok: true });
     broadcastRoom(room.roomCode);
   });
 
   socket.on("reveal-all", ({ roomCode, playerNumber, traitKeys } = {}) => {
     const room = getHostRoom(socket, roomCode);
     if (!room) {
+      return;
+    }
+
+    const lobby = getLobbyByRoomCode(room.roomCode);
+    if (lobby?.isGameStarted) {
       return;
     }
 
@@ -781,6 +934,15 @@ io.on("connection", (socket) => {
       room.gameLog.push(`Ведущий вернул Игрока ${number}`);
     }
     room.excludedPlayers = Array.from(excludedSet);
+    const lobby = getLobbyByRoomCode(room.roomCode);
+    if (lobby?.isGameStarted) {
+      if (excluded && Number(lobby.currentTurnPlayerNumber) === number) {
+        advanceLobbyTurn(lobby, room, number);
+      } else {
+        getCurrentTurnEntry(lobby, room);
+      }
+      broadcastLobby(room.roomCode);
+    }
     broadcastRoom(room.roomCode);
   });
 
@@ -901,6 +1063,11 @@ io.on("connection", (socket) => {
       return;
     }
 
+    if ((room.excludedPlayers || []).map(Number).includes(actorNumber)) {
+      sendReply(reply, { ok: false, error: "Исключенный игрок не может использовать способности" });
+      return;
+    }
+
     const abilityKey = `${actorNumber}:${abilityIndex}`;
     if (room.usedAbilities?.[abilityKey]) {
       sendReply(reply, { ok: false, error: "Эта способность уже использована" });
@@ -940,22 +1107,15 @@ io.on("connection", (socket) => {
       }
 
       player.connected = false;
+      const normalizedCode = normalizeRoomCode(room.roomCode);
+      const lobby = getLobbyByRoomCode(normalizedCode);
+      if (lobby?.isGameStarted && Number(lobby.currentTurnPlayerNumber) === Number(player.playerNumber)) {
+        advanceLobbyTurn(lobby, room, Number(player.playerNumber));
+        broadcastLobby(normalizedCode);
+      }
+
       if (room.hostId === socket.id) {
         room.gameLog.push("Ведущий отключился");
-        // If the disconnected player was the current player, advance the turn
-        const normalizedCode = normalizeRoomCode(room.roomCode);
-        const lobby = getLobbyByRoomCode(normalizedCode);
-        if (lobby?.isGameStarted && lobby.players.length > 0) {
-          const current = lobby.players[lobby.currentTurnIndex];
-          if (current && current.socketId === socket.id) {
-            advanceLobbyTurn(lobby);
-          }
-        }
-
-        // Broadcast update
-        if (lobby) {
-          broadcastLobby(normalizedCode);
-        }
       }
       broadcastRoom(room.roomCode);
     });
@@ -1003,7 +1163,7 @@ function createRoomForSocket(socket, rawPlayerName, reply) {
 
   console.log("Room created:", roomCode);
 
-  sendReply(reply, { ok: true, roomCode });
+  sendReply(reply, { ok: true, roomCode, playerId });
   socket.emit("roomCreated", { roomCode });
   broadcastRoom(roomCode);
   broadcastLobby(roomCode);
@@ -1274,6 +1434,11 @@ function resolveVotingRound(roomCode, reason = "timer") {
   const excluded = new Set((room.excludedPlayers || []).map(Number));
   excluded.add(eliminated);
   room.excludedPlayers = Array.from(excluded);
+  const lobby = getLobbyByRoomCode(room.roomCode);
+  if (lobby?.isGameStarted && Number(lobby.currentTurnPlayerNumber) === eliminated) {
+    advanceLobbyTurn(lobby, room, eliminated);
+    broadcastLobby(room.roomCode);
+  }
   room.gameLog.push(`Исключен Игрок ${eliminated}`);
 
   room.voting = {

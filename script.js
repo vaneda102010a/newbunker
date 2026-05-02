@@ -236,6 +236,8 @@ let currentSocketId = "";
 let roomPlayers = [];
 let localPlayerId = null;
 let currentLobby = null;
+let localTurnPlayerNumber = 1;
+let localRoundNumber = 1;
 let lastChangedCell = null;
 let isKicked = false;
 let characterView = getSavedCharacterView();
@@ -694,12 +696,111 @@ function isOnlineRoom() {
   return Boolean(currentRoomCode && socket?.connected);
 }
 
+function isTurnModeActive() {
+  return Boolean(currentPack?.players?.length) && (!isOnlineRoom() || currentLobby?.isGameStarted);
+}
+
+function getActiveTurnNumbers() {
+  if (!currentPack?.players?.length) {
+    return [];
+  }
+
+  return currentPack.players
+    .map((player) => Number(player.number))
+    .filter(Boolean)
+    .filter((number) => !excludedPlayers.has(number))
+    .sort((a, b) => a - b);
+}
+
+function normalizeLocalTurn() {
+  const activeNumbers = getActiveTurnNumbers();
+  if (!activeNumbers.length) {
+    localTurnPlayerNumber = null;
+    return null;
+  }
+
+  if (!activeNumbers.includes(Number(localTurnPlayerNumber))) {
+    localTurnPlayerNumber = activeNumbers[0];
+  }
+
+  return localTurnPlayerNumber;
+}
+
+function advanceLocalTurn(fromPlayerNumber = localTurnPlayerNumber) {
+  const activeNumbers = getActiveTurnNumbers();
+  if (!activeNumbers.length) {
+    localTurnPlayerNumber = null;
+    return;
+  }
+
+  const previousNumber = Number(fromPlayerNumber);
+  const currentIndex = activeNumbers.indexOf(previousNumber);
+  let nextIndex;
+
+  if (currentIndex === -1) {
+    nextIndex = activeNumbers.findIndex((number) => number > previousNumber);
+    if (nextIndex === -1) {
+      nextIndex = 0;
+      localRoundNumber += 1;
+    }
+  } else {
+    nextIndex = (currentIndex + 1) % activeNumbers.length;
+    if (nextIndex === 0) {
+      localRoundNumber += 1;
+    }
+  }
+
+  localTurnPlayerNumber = activeNumbers[nextIndex];
+}
+
+function getCurrentTurnPlayerNumber() {
+  if (isOnlineRoom() && currentLobby?.isGameStarted) {
+    const number = Number(currentLobby?.currentTurnPlayerNumber);
+    if (number) {
+      return number;
+    }
+
+    const currentPlayer = (currentLobby?.players || []).find((player) => player.id === currentLobby?.currentPlayerId);
+    return Number(currentPlayer?.playerNumber) || null;
+  }
+
+  return normalizeLocalTurn();
+}
+
+function isCurrentTurnPlayer(playerNumber) {
+  const currentTurnNumber = getCurrentTurnPlayerNumber();
+  return Boolean(currentTurnNumber) && Number(playerNumber) === Number(currentTurnNumber);
+}
+
+function getCurrentTurnRoomPlayer() {
+  const currentNumber = getCurrentTurnPlayerNumber();
+  if (!currentNumber) {
+    return null;
+  }
+
+  return roomPlayers.find((player) => Number(player.playerNumber) === Number(currentNumber)) || null;
+}
+
 function canRevealTrait(playerNumber) {
-  return isHostView() || isOwnPlayer(playerNumber);
+  const number = Number(playerNumber);
+  if (excludedPlayers.has(number)) {
+    return false;
+  }
+
+  if (isOnlineRoom() && currentLobby?.isGameStarted) {
+    return isOwnPlayer(number) && isCurrentTurnPlayer(number);
+  }
+
+  if (isHostView()) {
+    return isCurrentTurnPlayer(number);
+  }
+
+  return isOwnPlayer(number) && isCurrentTurnPlayer(number);
 }
 
 function canUseAbility(playerNumber) {
-  return isOwnPlayer(playerNumber);
+  const number = Number(playerNumber);
+  return isOwnPlayer(number) && !excludedPlayers.has(number);
 }
 
 function getConfiguredPlayerCount() {
@@ -781,23 +882,21 @@ function updateControlAvailability() {
   styleSelect.disabled = !isHostView();
   difficultySelect.disabled = !isHostView();
 
-  // When in online room, only allow full interactions for the active player.
+  // In online turn mode, reveals are turn-bound. Abilities stay available out of turn.
   if (isOnlineRoom()) {
-    const isMyTurn = currentLobby && localPlayerId && currentLobby.players && typeof currentLobby.currentTurnIndex === 'number'
-      ? (currentLobby.players[currentLobby.currentTurnIndex] && currentLobby.players[currentLobby.currentTurnIndex].id === localPlayerId)
-      : false;
-
-    // Disable most action buttons for non-active players, but keep ability buttons enabled.
     document.querySelectorAll('[data-action]').forEach((btn) => {
       try {
         const action = btn.dataset.action;
         if (action === 'use-ability') {
-          // abilities are allowed even out of turn
-          btn.disabled = false;
+          btn.disabled = btn.classList.contains("used")
+            || btn.classList.contains("locked")
+            || !canUseAbility(Number(btn.dataset.player));
         } else if (action === 'reveal-trait') {
           btn.disabled = !canRevealTrait(Number(btn.dataset.player));
+        } else if (action === "reveal-all") {
+          btn.disabled = isTurnModeActive();
         } else {
-          btn.disabled = !isMyTurn;
+          btn.disabled = false;
         }
       } catch (e) {}
     });
@@ -982,6 +1081,10 @@ function handleRoomReply(response) {
   }
 
   currentRoomCode = response.roomCode;
+  if (response.playerId) {
+    localPlayerId = response.playerId;
+    try { localStorage.setItem(`bunker_player_${currentRoomCode}`, localPlayerId); } catch (e) {}
+  }
   savePlayerName(getRoomPlayerName());
   showGameShell();
   setStartStatus("", "");
@@ -1024,14 +1127,16 @@ function applyLobbyState(lobby) {
   roomPlayersList.innerHTML = (lobby.players || [])
     .map((p) => {
       const name = escapeHtml(p.name || "Игрок");
-      const roleLabel = p.isHost ? "Ведущий" : "Игрок";
+      const number = Number(p.playerNumber) || null;
+      const roleLabel = p.isHost ? "Ведущий" : `Игрок ${number || "-"}`;
       const isCurrent = lobby.currentPlayerId && lobby.currentPlayerId === p.id;
+      const stateLabel = p.isExcluded ? " · выбыл" : isCurrent ? " · ход" : "";
       let kickButton = "";
       if (localPlayerId && lobby.hostId === localPlayerId && p.id !== localPlayerId) {
         kickButton = ` <button class="kick-button" data-player-id="${p.id}" data-socket-id="${p.socketId || ''}">Кик</button>`;
       }
 
-      return `<li${isCurrent ? ' class="current-turn"' : ''}><span>${name}</span> <strong>${roleLabel}${isCurrent ? ' (Ход)' : ''}</strong>${kickButton}</li>`;
+      return `<li${isCurrent ? ' class="current-turn"' : ''}><span>${name}</span> <strong>${roleLabel}${stateLabel}</strong>${kickButton}</li>`;
     })
     .join("");
 
@@ -1044,6 +1149,9 @@ function applyLobbyState(lobby) {
     }
   }
   // Update controls based on new lobby/turn state
+  if (currentPack?.players?.length) {
+    renderPack(currentPack);
+  }
   updateControlAvailability();
 }
 
@@ -1195,12 +1303,17 @@ function renderRoomInfo(room) {
   roomInviteLink.textContent = inviteUrl;
 
   roomPlayersList.innerHTML = (room.players || [])
-    .map((player) => `
-      <li>
+    .map((player) => {
+      const playerNumber = Number(player.playerNumber);
+      const isCurrent = currentLobby?.isGameStarted && Number(getCurrentTurnPlayerNumber()) === playerNumber;
+      const isExcluded = excludedPlayers.has(playerNumber);
+      return `
+      <li${isCurrent ? ' class="current-turn"' : ''}>
         <span>${escapeHtml(player.name || `Игрок ${player.playerNumber || "?"}`)}</span>
-        <strong>${player.isHost ? "Ведущий" : `Игрок ${player.playerNumber || "-"}`}</strong>
+        <strong>${player.isHost ? "Ведущий" : `Игрок ${player.playerNumber || "-"}`}${isExcluded ? " · выбыл" : isCurrent ? " · ход" : ""}</strong>
       </li>
-    `)
+    `;
+    })
     .join("");
 }
 
@@ -1721,6 +1834,7 @@ function renderCharacters(characters) {
   characterGrid.classList.toggle("table-view", characterView === VIEW_TABLE);
   characterGrid.dataset.playerCount = String(characters.length);
   updateViewToggle();
+  renderTurnBanner();
 
   if (characterView === VIEW_TABLE) {
     renderPlayersTable(characters);
@@ -1734,7 +1848,8 @@ function renderCharacters(characters) {
     const card = document.createElement("article");
     const isExcluded = excludedPlayers.has(character.number);
     const isOwn = isOwnPlayer(character.number);
-    card.className = `character-card${isExcluded ? " excluded" : ""}${isOwn ? " own-card" : ""}`;
+    const isTurn = isCurrentTurnPlayer(character.number);
+    card.className = `character-card${isExcluded ? " excluded" : ""}${isOwn ? " own-card" : ""}${isTurn ? " current-turn-card" : ""}`;
     card.style.setProperty("--accent", character.accent);
 
     card.innerHTML = `
@@ -1747,7 +1862,7 @@ function renderCharacters(characters) {
           ${characterTraits.map((trait) => renderTraitRow(character, trait)).join("")}
         </dl>
         ${isHostView() ? `
-          <button class="reveal-all-button" type="button" data-action="reveal-all" data-player="${character.number}">
+          <button class="reveal-all-button" type="button" data-action="reveal-all" data-player="${character.number}" ${isTurnModeActive() ? "disabled" : ""}>
             Открыть все
           </button>
           <button class="exclude-button${isExcluded ? " active" : ""}" type="button" data-action="exclude" data-player="${character.number}" ${gameIsOver && !isExcluded ? "disabled" : ""}>
@@ -1812,10 +1927,11 @@ function renderPlayersTable(characters) {
 function renderPlayerTableRow(character, gameIsOver, visibleTableTraits = tableTraits) {
   const isExcluded = excludedPlayers.has(character.number);
   const isOwn = isOwnPlayer(character.number);
+  const isTurn = isCurrentTurnPlayer(character.number);
   const playerTitle = getTablePlayerTitle(character);
 
   return `
-    <tr class="${isExcluded ? "excluded" : ""}${isOwn ? " own-row" : ""}" style="--accent: ${character.accent}" data-player="${character.number}">
+    <tr class="${isExcluded ? "excluded" : ""}${isOwn ? " own-row" : ""}${isTurn ? " current-turn-row" : ""}" style="--accent: ${character.accent}" data-player="${character.number}">
       <td class="players-table-player" title="${escapeHtml(playerTitle)}">${renderPlayerTableSlot(character, isExcluded, gameIsOver)}</td>
       ${visibleTableTraits.map((trait, columnIndex) => {
         return `
@@ -1878,7 +1994,7 @@ function renderPlayerTableSlot(character, isExcluded, gameIsOver) {
       </div>
       ${isHostView() ? `
         <div class="players-table-host-actions">
-          <button class="trait-mini-action" type="button" data-action="reveal-all" data-player="${character.number}" aria-label="Открыть все Игроку ${character.number}">◎</button>
+          <button class="trait-mini-action" type="button" data-action="reveal-all" data-player="${character.number}" aria-label="Открыть все Игроку ${character.number}" ${isTurnModeActive() ? "disabled" : ""}>◎</button>
           <button class="trait-mini-action exclude-table-action${isExcluded ? " active" : ""}" type="button" data-action="exclude" data-player="${character.number}" aria-label="${isExcluded ? "Вернуть" : "Исключить"} Игрока ${character.number}" ${gameIsOver && !isExcluded ? "disabled" : ""}>${isExcluded ? "↩" : "×"}</button>
         </div>
       ` : ""}
@@ -2426,6 +2542,30 @@ function getPlayerAbilityItems(player) {
   });
 }
 
+function renderTurnBanner() {
+  const shouldShowTurn = currentPack?.players?.length
+    && (!isOnlineRoom() || currentLobby?.isGameStarted);
+
+  if (!shouldShowTurn) {
+    return;
+  }
+
+  const currentNumber = getCurrentTurnPlayerNumber();
+  const currentPlayer = getCurrentTurnRoomPlayer();
+  const playerName = currentPlayer?.name || (currentNumber ? `Игрок ${currentNumber}` : "Игрок");
+  const roundNumber = isOnlineRoom() ? Number(currentLobby?.roundNumber) || 1 : localRoundNumber;
+  const isMine = currentNumber && Number(currentNumber) === Number(currentPlayerNumber);
+
+  const banner = document.createElement("div");
+  banner.className = `turn-banner${isMine ? " own-turn" : ""}`;
+  banner.innerHTML = `
+    <span>Раунд ${roundNumber}</span>
+    <strong>Ход: Игрок ${currentNumber || "-"}${playerName ? ` · ${escapeHtml(playerName)}` : ""}</strong>
+    <em>${isMine ? "Можно открыть одну характеристику" : "Ожидание хода"}</em>
+  `;
+  characterGrid.append(banner);
+}
+
 function getPlayerByNumber(playerNumber) {
   return currentPack?.players?.find((player) => player.number === Number(playerNumber)) || null;
 }
@@ -2674,19 +2814,30 @@ function markNewlyRevealedTraits(nextRevealedTraits) {
 
 function revealTrait(playerNumber, traitKey) {
   if (isOnlineRoom()) {
-    socket.emit("reveal-trait", { roomCode: currentRoomCode, playerNumber, traitKey });
+    socket.emit("reveal-trait", { roomCode: currentRoomCode, playerNumber, traitKey }, (response) => {
+      if (response && !response.ok) {
+        setStatus(response.error || "Сейчас нельзя открыть характеристику.", "error");
+      }
+    });
     return;
   }
 
   const wasOpened = setTraitRevealed(playerNumber, traitKey);
   if (wasOpened) {
     addGameLog(`Открыта характеристика Игрока ${playerNumber}: ${getTraitAccusative(traitKey)}`);
+    advanceLocalTurn(playerNumber);
     renderGameLog();
   }
+  normalizeLocalTurn();
   renderPack(currentPack);
 }
 
 function revealAllTraits(playerNumber) {
+  if (isTurnModeActive()) {
+    setStatus("В пошаговом режиме можно открыть только одну характеристику за ход.", "error");
+    return;
+  }
+
   if (isOnlineRoom()) {
     socket.emit("reveal-all", {
       roomCode: currentRoomCode,
@@ -2749,8 +2900,14 @@ function toggleExcluded(playerNumber) {
     }
 
     excludedPlayers.add(playerNumber);
+    if (Number(localTurnPlayerNumber) === Number(playerNumber)) {
+      advanceLocalTurn(playerNumber);
+    } else {
+      normalizeLocalTurn();
+    }
   }
 
+  normalizeLocalTurn();
   renderPack(currentPack);
 
   if (isGameOver()) {
@@ -2881,6 +3038,8 @@ function resetGameState(pack) {
   protectedPlayers = new Set();
   gameLog = [];
   pendingAbility = null;
+  localTurnPlayerNumber = 1;
+  localRoundNumber = 1;
   votingState = null;
   votingSetupOpen = false;
   localVotingCandidates = new Set();
