@@ -2736,6 +2736,10 @@ button:focus-visible {
   display: none;
 }
 
+.start-flow-modal {
+  z-index: 130;
+}
+
 /* Video background — fills container, sits at the very bottom of the stack */
 .start-video {
   position: absolute;

@@ -194,6 +194,7 @@ Object.entries(STATIC_FILES).forEach(([route, fileName]) => {
 });
 
 app.use("/core", express.static(path.join(PUBLIC_DIR, "core")));
+app.use("/images", express.static(path.join(PUBLIC_DIR, "images")));
 app.use("/themes", express.static(THEME_DIR));
 
 function getSafeThemeId(theme) {
