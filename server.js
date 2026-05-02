@@ -943,8 +943,9 @@ io.on("connection", (socket) => {
       if (room.hostId === socket.id) {
         room.gameLog.push("Ведущий отключился");
         // If the disconnected player was the current player, advance the turn
-        const normalizedCode = normalizeRoomCode(lobby.roomCode);
-        if (lobby.isGameStarted && lobby.players.length > 0) {
+        const normalizedCode = normalizeRoomCode(room.roomCode);
+        const lobby = getLobbyByRoomCode(normalizedCode);
+        if (lobby?.isGameStarted && lobby.players.length > 0) {
           const current = lobby.players[lobby.currentTurnIndex];
           if (current && current.socketId === socket.id) {
             advanceLobbyTurn(lobby);
@@ -952,8 +953,7 @@ io.on("connection", (socket) => {
         }
 
         // Broadcast update
-        const room = rooms.get(normalizeRoomCode(lobby.roomCode));
-        if (room) {
+        if (lobby) {
           broadcastLobby(normalizedCode);
         }
       }
