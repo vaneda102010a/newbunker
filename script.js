@@ -4,6 +4,7 @@ const ROLE_PLAYER = "player";
 const VIEW_CARDS = "cards";
 const VIEW_TABLE = "table";
 const CHARACTER_VIEW_STORAGE_KEY = "bunkerCharacterView";
+const START_PLAYER_NAME_STORAGE_KEY = "bunkerPlayerName";
 const PUBLIC_APP_URL = "http://198.211.104.191:3000";
 const DEFAULT_THEME_ID = "classic";
 const themes = [
@@ -146,6 +147,13 @@ const createRoomButton = document.querySelector("#createRoomButton");
 const joinRoomButton = document.querySelector("#joinRoomButton");
 const roomNameInput = document.querySelector("#roomNameInput");
 const roomCodeInput = document.querySelector("#roomCodeInput");
+const startScreen = document.querySelector("#startScreen");
+const startPlayerNameInput = document.querySelector("#startPlayerNameInput");
+const startRoomCodeInput = document.querySelector("#startRoomCodeInput");
+const startCreateButton = document.querySelector("#startCreateButton");
+const startJoinButton = document.querySelector("#startJoinButton");
+const startDevTestButton = document.querySelector("#startDevTestButton");
+const startStatus = document.querySelector("#startStatus");
 const roomInfo = document.querySelector("#roomInfo");
 const roomCodeDisplay = document.querySelector("#roomCodeDisplay");
 const roomInviteLink = document.querySelector("#roomInviteLink");
@@ -177,7 +185,7 @@ const abilityTraitSelect = document.querySelector("#abilityTraitSelect");
 const abilityAdminNote = document.querySelector("#abilityAdminNote");
 const abilityConfirmButton = document.querySelector("#abilityConfirmButton");
 const abilityCancelButton = document.querySelector("#abilityCancelButton");
-const appContainer = document.querySelector(".app-container, .page");
+const appContainer = document.querySelector("#appContainer, .app-container, .page");
 
 let cardDatabase = createEmptyCardDatabase();
 let currentPack = null;
@@ -390,6 +398,164 @@ function getSettings() {
   };
 }
 
+function getUrlParams() {
+  return new URLSearchParams(window.location.search);
+}
+
+function setStartStatus(message, type = "") {
+  if (!startStatus) {
+    return;
+  }
+
+  startStatus.textContent = message || "";
+  startStatus.dataset.type = type;
+}
+
+function getSavedPlayerName() {
+  try {
+    return localStorage.getItem(START_PLAYER_NAME_STORAGE_KEY) || "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function savePlayerName(playerName) {
+  const cleanedName = cleanText(playerName, "").trim();
+
+  if (!cleanedName) {
+    return;
+  }
+
+  try {
+    localStorage.setItem(START_PLAYER_NAME_STORAGE_KEY, cleanedName);
+  } catch (error) {
+    // localStorage can be unavailable in private or restricted contexts.
+  }
+}
+
+function syncStartPlayerName(playerName) {
+  const cleanedName = cleanText(playerName, "").trim();
+
+  if (startPlayerNameInput) {
+    startPlayerNameInput.value = cleanedName;
+  }
+
+  if (roomNameInput) {
+    roomNameInput.value = cleanedName;
+  }
+
+  if (playerNameInput) {
+    playerNameInput.value = cleanedName;
+  }
+
+  currentPlayerName = cleanedName;
+}
+
+function normalizeStartRoomCode(roomCode) {
+  return cleanText(roomCode, "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+}
+
+function syncStartRoomCode(roomCode) {
+  const normalizedCode = normalizeStartRoomCode(roomCode);
+
+  if (startRoomCodeInput) {
+    startRoomCodeInput.value = normalizedCode;
+  }
+
+  if (roomCodeInput) {
+    roomCodeInput.value = normalizedCode;
+  }
+}
+
+function showGameShell() {
+  if (startScreen) {
+    startScreen.hidden = true;
+  }
+
+  if (appContainer) {
+    appContainer.hidden = false;
+  }
+}
+
+function showStartScreen() {
+  if (startScreen) {
+    startScreen.hidden = false;
+  }
+
+  if (appContainer) {
+    appContainer.hidden = true;
+  }
+}
+
+function getStartPlayerName() {
+  return cleanText(startPlayerNameInput?.value || roomNameInput?.value, "").trim();
+}
+
+function startCreateGame() {
+  const playerName = getStartPlayerName();
+
+  if (!playerName) {
+    setStartStatus("Введите имя игрока.", "error");
+    startPlayerNameInput?.focus();
+    return;
+  }
+
+  syncStartPlayerName(playerName);
+  savePlayerName(playerName);
+  setStartStatus("Создаем комнату...", "");
+  createOnlineRoomAfterConfirm(playerName);
+}
+
+function startJoinGame() {
+  const playerName = getStartPlayerName();
+  const roomCode = normalizeStartRoomCode(startRoomCodeInput?.value || roomCodeInput?.value);
+
+  if (!playerName) {
+    setStartStatus("Введите имя игрока.", "error");
+    startPlayerNameInput?.focus();
+    return;
+  }
+
+  if (!roomCode) {
+    setStartStatus("Введите код комнаты.", "error");
+    startRoomCodeInput?.focus();
+    return;
+  }
+
+  syncStartPlayerName(playerName);
+  syncStartRoomCode(roomCode);
+  savePlayerName(playerName);
+  setStartStatus("Подключаемся к комнате...", "");
+  joinOnlineRoom();
+}
+
+function startDevTestGame() {
+  syncStartPlayerName("Test");
+  savePlayerName("Test");
+  setStartStatus("Запуск быстрого теста...", "");
+  createOnlineRoomAfterConfirm("Test");
+}
+
+function initializeStartScreen() {
+  const savedName = getSavedPlayerName();
+  const params = getUrlParams();
+  const inviteCode = params.get("room");
+
+  if (savedName) {
+    syncStartPlayerName(savedName);
+  }
+
+  if (inviteCode) {
+    syncStartRoomCode(inviteCode);
+  }
+
+  showStartScreen();
+}
+
+function shouldRunDevShortcut() {
+  return getUrlParams().get("dev") === "1";
+}
+
 function isHostView() {
   return appRole === ROLE_HOST;
 }
@@ -529,11 +695,12 @@ function initializeSocket() {
       emitCreateRoom(playerName);
     }
 
-    const inviteCode = new URLSearchParams(window.location.search).get("room");
+    const inviteCode = getUrlParams().get("room");
 
     if (inviteCode && roomCodeInput && !currentRoomCode) {
-      roomCodeInput.value = inviteCode.toUpperCase();
+      syncStartRoomCode(inviteCode);
       setStatus("Введите имя и нажмите «Присоединиться к комнате».", "");
+      setStartStatus("Введите имя и нажмите «Присоединиться».", "");
     }
   });
 
@@ -684,10 +851,14 @@ function joinOnlineRoom() {
 function handleRoomReply(response) {
   if (!response?.ok) {
     setStatus(response?.error || "Не удалось подключиться к комнате.", "error");
+    setStartStatus(response?.error || "Не удалось подключиться к комнате.", "error");
     return;
   }
 
   currentRoomCode = response.roomCode;
+  savePlayerName(getRoomPlayerName());
+  showGameShell();
+  setStartStatus("", "");
   setStatus(`Комната ${currentRoomCode} подключена.`, "success");
   // Try to join/reconnect to lobby using persistent playerId
   try {
@@ -852,6 +1023,7 @@ function applyRoomState({ room, currentUser }) {
     return;
   }
 
+  showGameShell();
   markNewlyRevealedTraits(room.revealedTraits || {});
   currentRoomCode = room.roomCode;
   currentSocketId = socket?.id || currentUser.socketId || currentSocketId;
@@ -3884,6 +4056,27 @@ if (document.readyState === "loading") {
 joinRoomButton?.addEventListener("click", joinOnlineRoom);
 roomCodeInput?.addEventListener("input", () => {
   roomCodeInput.value = roomCodeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+  syncStartRoomCode(roomCodeInput.value);
+});
+startCreateButton?.addEventListener("click", startCreateGame);
+startJoinButton?.addEventListener("click", startJoinGame);
+startDevTestButton?.addEventListener("click", startDevTestGame);
+startPlayerNameInput?.addEventListener("input", () => {
+  syncStartPlayerName(startPlayerNameInput.value);
+  savePlayerName(startPlayerNameInput.value);
+});
+startRoomCodeInput?.addEventListener("input", () => {
+  syncStartRoomCode(startRoomCodeInput.value);
+});
+startPlayerNameInput?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    startCreateGame();
+  }
+});
+startRoomCodeInput?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    startJoinGame();
+  }
 });
 hostRoleButton?.addEventListener("click", () => setRole(ROLE_HOST));
 playerRoleButton?.addEventListener("click", () => setRole(ROLE_PLAYER));
@@ -3905,6 +4098,7 @@ playerCountSelect.addEventListener("change", () => {
 });
 themeSelect?.addEventListener("change", applySelectedTheme);
 
+initializeStartScreen();
 setGenerationReady(false);
 renderThemeOptions();
 applySelectedTheme();
@@ -3917,6 +4111,9 @@ if (window.location.protocol === "file:") {
   setStatus(message, "error");
 } else {
   initializeSocket();
+  if (shouldRunDevShortcut()) {
+    window.setTimeout(startDevTestGame, 0);
+  }
   loadCardDatabase()
     .then((database) => {
       cardDatabase = database;

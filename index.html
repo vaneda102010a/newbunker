@@ -9,7 +9,34 @@
   <link id="theme-style" rel="stylesheet">
 </head>
 <body>
-  <div class="page app-container">
+  <section class="start-screen" id="startScreen" aria-label="Главное меню">
+    <div class="start-panel">
+      <span class="eyebrow">Бункер</span>
+      <h1>Bunker Game</h1>
+
+      <label class="field">
+        <span>Имя игрока</span>
+        <input id="startPlayerNameInput" type="text" placeholder="Ваше имя" autocomplete="name">
+      </label>
+
+      <div class="start-actions">
+        <button class="main-button" id="startCreateButton" type="button">Создать игру</button>
+
+        <div class="start-join">
+          <label class="field">
+            <span>Код комнаты</span>
+            <input id="startRoomCodeInput" type="text" placeholder="AB12CD" maxlength="6" autocomplete="off">
+          </label>
+          <button class="secondary-button" id="startJoinButton" type="button">Присоединиться</button>
+        </div>
+      </div>
+
+      <p class="start-status" id="startStatus" role="status" aria-live="polite"></p>
+      <button class="start-test-button" id="startDevTestButton" type="button">Быстрый тест</button>
+    </div>
+  </section>
+
+  <div class="page app-container" id="appContainer" hidden>
     <header class="top-header">
       <div class="title-block">
         <h1>Генератор паков для игры Бункер</h1>
