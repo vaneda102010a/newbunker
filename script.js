@@ -148,11 +148,20 @@ const joinRoomButton = document.querySelector("#joinRoomButton");
 const roomNameInput = document.querySelector("#roomNameInput");
 const roomCodeInput = document.querySelector("#roomCodeInput");
 const startScreen = document.querySelector("#startScreen");
-const startPlayerNameInput = document.querySelector("#startPlayerNameInput");
-const startRoomCodeInput = document.querySelector("#startRoomCodeInput");
 const startCreateButton = document.querySelector("#startCreateButton");
 const startJoinButton = document.querySelector("#startJoinButton");
 const startDevTestButton = document.querySelector("#startDevTestButton");
+const startCreateModal = document.querySelector("#startCreateModal");
+const startJoinModal = document.querySelector("#startJoinModal");
+const startCreateNameInput = document.querySelector("#startCreateNameInput");
+const startJoinNameInput = document.querySelector("#startJoinNameInput");
+const startJoinRoomCodeInput = document.querySelector("#startJoinRoomCodeInput");
+const startCreateThemeSelect = document.querySelector("#startCreateThemeSelect");
+const startCreatePlayerCountSelect = document.querySelector("#startCreatePlayerCountSelect");
+const startCreateStyleSelect = document.querySelector("#startCreateStyleSelect");
+const startCreateDifficultySelect = document.querySelector("#startCreateDifficultySelect");
+const startCreateConfirmButton = document.querySelector("#startCreateConfirmButton");
+const startJoinConfirmButton = document.querySelector("#startJoinConfirmButton");
 const startStatus = document.querySelector("#startStatus");
 const roomInfo = document.querySelector("#roomInfo");
 const roomCodeDisplay = document.querySelector("#roomCodeDisplay");
@@ -255,9 +264,15 @@ function renderThemeOptions() {
     return;
   }
 
-  themeSelect.innerHTML = themes
+  const options = themes
     .map((theme) => `<option value="${theme.id}" ${theme.id === DEFAULT_THEME_ID ? "selected" : ""}>${theme.name}</option>`)
     .join("");
+
+  themeSelect.innerHTML = options;
+
+  if (startCreateThemeSelect) {
+    startCreateThemeSelect.innerHTML = options;
+  }
 }
 
 function getThemeById(themeId) {
@@ -436,8 +451,12 @@ function savePlayerName(playerName) {
 function syncStartPlayerName(playerName) {
   const cleanedName = cleanText(playerName, "").trim();
 
-  if (startPlayerNameInput) {
-    startPlayerNameInput.value = cleanedName;
+  if (startCreateNameInput) {
+    startCreateNameInput.value = cleanedName;
+  }
+
+  if (startJoinNameInput) {
+    startJoinNameInput.value = cleanedName;
   }
 
   if (roomNameInput) {
@@ -458,8 +477,8 @@ function normalizeStartRoomCode(roomCode) {
 function syncStartRoomCode(roomCode) {
   const normalizedCode = normalizeStartRoomCode(roomCode);
 
-  if (startRoomCodeInput) {
-    startRoomCodeInput.value = normalizedCode;
+  if (startJoinRoomCodeInput) {
+    startJoinRoomCodeInput.value = normalizedCode;
   }
 
   if (roomCodeInput) {
@@ -487,52 +506,137 @@ function showStartScreen() {
   }
 }
 
-function getStartPlayerName() {
-  return cleanText(startPlayerNameInput?.value || roomNameInput?.value, "").trim();
+function openStartCreateModal() {
+  setStartStatus("", "");
+  const savedName = getSavedPlayerName();
+
+  if (savedName) {
+    syncStartPlayerName(savedName);
+  }
+
+  if (startCreateThemeSelect && themeSelect) {
+    startCreateThemeSelect.value = themeSelect.value || DEFAULT_THEME_ID;
+  }
+
+  if (startCreatePlayerCountSelect && playerCountSelect) {
+    startCreatePlayerCountSelect.value = playerCountSelect.value;
+  }
+
+  if (startCreateStyleSelect && styleSelect) {
+    startCreateStyleSelect.value = styleSelect.value;
+  }
+
+  if (startCreateDifficultySelect && difficultySelect) {
+    startCreateDifficultySelect.value = difficultySelect.value;
+  }
+
+  if (startCreateModal) {
+    startCreateModal.hidden = false;
+    startCreateNameInput?.focus();
+  }
+}
+
+function openStartJoinModal() {
+  setStartStatus("", "");
+  const savedName = getSavedPlayerName();
+
+  if (savedName) {
+    syncStartPlayerName(savedName);
+  }
+
+  if (startJoinModal) {
+    startJoinModal.hidden = false;
+    startJoinNameInput?.focus();
+  }
+}
+
+function closeStartModals() {
+  if (startCreateModal) {
+    startCreateModal.hidden = true;
+  }
+
+  if (startJoinModal) {
+    startJoinModal.hidden = true;
+  }
+}
+
+function applyStartCreateSettings() {
+  if (startCreateThemeSelect && themeSelect) {
+    themeSelect.value = startCreateThemeSelect.value || DEFAULT_THEME_ID;
+  }
+
+  if (startCreatePlayerCountSelect && playerCountSelect) {
+    playerCountSelect.value = startCreatePlayerCountSelect.value;
+  }
+
+  if (startCreateStyleSelect && styleSelect) {
+    styleSelect.value = startCreateStyleSelect.value;
+  }
+
+  if (startCreateDifficultySelect && difficultySelect) {
+    difficultySelect.value = startCreateDifficultySelect.value;
+  }
+
+  currentPlayerNumber = clampPlayerNumber(currentPlayerNumber);
+  updatePlayerNumberOptions();
+  applySelectedTheme();
 }
 
 function startCreateGame() {
-  const playerName = getStartPlayerName();
+  const playerName = cleanText(startCreateNameInput?.value || roomNameInput?.value, "").trim();
 
   if (!playerName) {
     setStartStatus("Введите имя игрока.", "error");
-    startPlayerNameInput?.focus();
+    startCreateNameInput?.focus();
     return;
   }
 
+  appRole = ROLE_HOST;
   syncStartPlayerName(playerName);
+  applyStartCreateSettings();
   savePlayerName(playerName);
   setStartStatus("Создаем комнату...", "");
+  closeStartModals();
+  updateRoleControls();
+  updateControlAvailability();
   createOnlineRoomAfterConfirm(playerName);
 }
 
 function startJoinGame() {
-  const playerName = getStartPlayerName();
-  const roomCode = normalizeStartRoomCode(startRoomCodeInput?.value || roomCodeInput?.value);
+  const playerName = cleanText(startJoinNameInput?.value || roomNameInput?.value, "").trim();
+  const roomCode = normalizeStartRoomCode(startJoinRoomCodeInput?.value || roomCodeInput?.value);
 
   if (!playerName) {
     setStartStatus("Введите имя игрока.", "error");
-    startPlayerNameInput?.focus();
+    startJoinNameInput?.focus();
     return;
   }
 
   if (!roomCode) {
     setStartStatus("Введите код комнаты.", "error");
-    startRoomCodeInput?.focus();
+    startJoinRoomCodeInput?.focus();
     return;
   }
 
+  appRole = ROLE_PLAYER;
   syncStartPlayerName(playerName);
   syncStartRoomCode(roomCode);
   savePlayerName(playerName);
   setStartStatus("Подключаемся к комнате...", "");
+  closeStartModals();
+  updateRoleControls();
+  updateControlAvailability();
   joinOnlineRoom();
 }
 
 function startDevTestGame() {
+  appRole = ROLE_HOST;
   syncStartPlayerName("Test");
   savePlayerName("Test");
   setStartStatus("Запуск быстрого теста...", "");
+  closeStartModals();
+  updateRoleControls();
+  updateControlAvailability();
   createOnlineRoomAfterConfirm("Test");
 }
 
@@ -651,6 +755,9 @@ function updateControlAvailability() {
   const hostCanGenerate = cardsAreReady && !themeIsLoading && isHostView();
   generateButton.disabled = !hostCanGenerate;
   randomThemeButton.disabled = !hostCanGenerate;
+  if (settingsPanelButton) {
+    settingsPanelButton.disabled = !isHostView();
+  }
   playerCountSelect.disabled = !isHostView();
   themeSelect.disabled = !isHostView();
   styleSelect.disabled = !isHostView();
@@ -4058,22 +4165,46 @@ roomCodeInput?.addEventListener("input", () => {
   roomCodeInput.value = roomCodeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
   syncStartRoomCode(roomCodeInput.value);
 });
-startCreateButton?.addEventListener("click", startCreateGame);
-startJoinButton?.addEventListener("click", startJoinGame);
+startCreateButton?.addEventListener("click", openStartCreateModal);
+startJoinButton?.addEventListener("click", openStartJoinModal);
 startDevTestButton?.addEventListener("click", startDevTestGame);
-startPlayerNameInput?.addEventListener("input", () => {
-  syncStartPlayerName(startPlayerNameInput.value);
-  savePlayerName(startPlayerNameInput.value);
+startCreateConfirmButton?.addEventListener("click", startCreateGame);
+startJoinConfirmButton?.addEventListener("click", startJoinGame);
+startCreateNameInput?.addEventListener("input", () => {
+  syncStartPlayerName(startCreateNameInput.value);
+  savePlayerName(startCreateNameInput.value);
 });
-startRoomCodeInput?.addEventListener("input", () => {
-  syncStartRoomCode(startRoomCodeInput.value);
+startJoinNameInput?.addEventListener("input", () => {
+  syncStartPlayerName(startJoinNameInput.value);
+  savePlayerName(startJoinNameInput.value);
 });
-startPlayerNameInput?.addEventListener("keydown", (event) => {
+startJoinRoomCodeInput?.addEventListener("input", () => {
+  syncStartRoomCode(startJoinRoomCodeInput.value);
+});
+document.querySelectorAll("[data-start-modal-close]").forEach((button) => {
+  button.addEventListener("click", closeStartModals);
+});
+startCreateModal?.addEventListener("click", (event) => {
+  if (event.target === startCreateModal) {
+    closeStartModals();
+  }
+});
+startJoinModal?.addEventListener("click", (event) => {
+  if (event.target === startJoinModal) {
+    closeStartModals();
+  }
+});
+startCreateNameInput?.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     startCreateGame();
   }
 });
-startRoomCodeInput?.addEventListener("keydown", (event) => {
+startJoinNameInput?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    startJoinRoomCodeInput?.focus();
+  }
+});
+startJoinRoomCodeInput?.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     startJoinGame();
   }

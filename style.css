@@ -67,11 +67,23 @@
   margin-top: 14px;
 }
 
-.start-join {
-  display: grid;
-  gap: 10px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.075);
+.start-actions .main-button,
+.start-actions .secondary-button {
+  width: 100%;
+  min-height: 42px;
+}
+
+.start-menu-modal {
+  position: relative;
+  width: min(100%, 430px);
+}
+
+.start-menu-modal .field {
+  margin-top: 10px;
+}
+
+.start-menu-modal .modal-actions {
+  margin-top: 16px;
 }
 
 .start-status {
