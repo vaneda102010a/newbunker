@@ -152,3 +152,45 @@ body.theme-fantasy::before {
 .theme-fantasy button:disabled {
   transform: none;
 }
+
+/* Keep fantasy player colors consistent between the table and ability cards. */
+.theme-fantasy .players-table tbody tr > td {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent, #a970ff) 18%, rgba(10, 12, 30, 0)), transparent 76%),
+    rgba(10, 12, 30, 0.48);
+}
+
+.theme-fantasy .players-table tbody tr:nth-child(even) > td {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent, #a970ff) 21%, rgba(10, 12, 30, 0)), transparent 76%),
+    rgba(14, 16, 38, 0.56);
+}
+
+.theme-fantasy .players-table tbody tr > .players-table-player {
+  border-left: 3px solid color-mix(in srgb, var(--accent, #a970ff) 82%, rgba(255, 255, 255, 0.18));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent, #a970ff) 32%, rgba(10, 12, 30, 0)), transparent 82%),
+    rgba(10, 12, 30, 0.78);
+  box-shadow:
+    inset 2px 0 0 color-mix(in srgb, var(--accent, #a970ff) 62%, transparent),
+    0 0 22px color-mix(in srgb, var(--accent, #a970ff) 18%, transparent);
+}
+
+.theme-fantasy .players-table tbody tr.own-row > td,
+.theme-fantasy .players-table tbody tr.own-row > th {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent, #a970ff) 34%, rgba(10, 12, 30, 0)), transparent 76%),
+    rgba(18, 16, 46, 0.68);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--accent, #a970ff) 30%, transparent),
+    0 0 28px color-mix(in srgb, var(--accent, #a970ff) 18%, transparent);
+}
+
+.theme-fantasy .ability-player-card {
+  border-color: color-mix(in srgb, var(--accent, #a970ff) 44%, rgba(255, 255, 255, 0.14));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 0 1px color-mix(in srgb, var(--accent, #a970ff) 18%, transparent),
+    0 0 34px color-mix(in srgb, var(--accent, #a970ff) 18%, transparent),
+    0 18px 44px rgba(0, 0, 0, 0.42);
+}
