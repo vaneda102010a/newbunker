@@ -952,6 +952,38 @@ io.on("connection", (socket) => {
     broadcastRoom(room.roomCode);
   });
 
+  socket.on("force-reveal-trait", ({ roomCode, playerNumber, traitKey } = {}, reply) => {
+    const room = getHostRoom(socket, roomCode);
+    const number = Number(playerNumber);
+
+    if (!room || !number || !traitKey) {
+      sendReply(reply, { ok: false, error: "Нельзя открыть характеристику" });
+      return;
+    }
+
+    setTraitRevealed(room, number, traitKey);
+    room.gameLog.push(`Ведущий принудительно открыл ${getTraitAccusative(traitKey)} Игрока ${number}`);
+    sendReply(reply, { ok: true });
+    broadcastRoom(room.roomCode);
+  });
+
+  socket.on("force-reveal-all", ({ roomCode, playerNumber, traitKeys } = {}, reply) => {
+    const room = getHostRoom(socket, roomCode);
+    const number = Number(playerNumber);
+
+    if (!room || !number) {
+      sendReply(reply, { ok: false, error: "Нельзя открыть характеристики" });
+      return;
+    }
+
+    (Array.isArray(traitKeys) ? traitKeys : []).forEach((traitKey) => {
+      setTraitRevealed(room, number, traitKey);
+    });
+    room.gameLog.push(`Ведущий принудительно открыл все характеристики Игрока ${number}`);
+    sendReply(reply, { ok: true });
+    broadcastRoom(room.roomCode);
+  });
+
   socket.on("exclude-player", ({ roomCode, playerNumber, excluded } = {}) => {
     const room = getHostRoom(socket, roomCode);
     if (!room) {
@@ -1092,6 +1124,28 @@ io.on("connection", (socket) => {
     }
 
     resolveVotingRound(room.roomCode, "manual");
+    sendReply(reply, { ok: true });
+  });
+
+  socket.on("voting-defense-decision", ({ roomCode, decision } = {}, reply) => {
+    const room = getHostRoom(socket, roomCode);
+    if (!room) {
+      sendReply(reply, { ok: false, error: "Только ведущий может принять решение" });
+      return;
+    }
+
+    if (room.voting?.status !== "pending-decision" || !room.voting?.defense?.targetNumber) {
+      sendReply(reply, { ok: false, error: "Нет активного решения по защите" });
+      return;
+    }
+
+    const normalizedDecision = decision === "kick" ? "kick" : decision === "keep" ? "keep" : "";
+    if (!normalizedDecision) {
+      sendReply(reply, { ok: false, error: "Некорректное решение" });
+      return;
+    }
+
+    finalizeVotingDefense(room, normalizedDecision, "host-decision");
     sendReply(reply, { ok: true });
   });
 
@@ -1452,22 +1506,152 @@ function resolveVotingRound(roomCode, reason = "timer") {
     return;
   }
 
-  const eliminated = Number(winnerEntry[0]);
-  if (consumeVotingProtection(room, eliminated)) {
-    const message = `Игрок ${eliminated} был защищен и не был исключен`;
+  const defenseTarget = Number(winnerEntry[0]);
+  const excluded = new Set((room.excludedPlayers || []).map(Number));
+
+  if (excluded.has(defenseTarget)) {
+    const message = `Игрок ${defenseTarget} уже исключен. Защита не начата.`;
     room.gameLog.push(message);
     room.voting = {
       ...voting,
       active: false,
       status: "ended",
       result: {
-        type: "protected",
+        type: "already-eliminated",
         reason,
         counts,
         neededVotes,
         alivePlayers,
         eliminated: null,
-        protectedPlayer: eliminated,
+        message
+      },
+      message
+    };
+    broadcastRoom(room.roomCode);
+    return;
+  }
+
+  startVotingDefensePhase(room, voting, {
+    reason,
+    counts,
+    neededVotes,
+    alivePlayers,
+    targetNumber: defenseTarget
+  });
+}
+
+function startVotingDefensePhase(room, voting, resultContext) {
+  clearVotingTimer(room);
+
+  const now = Date.now();
+  const durationMs = 20000;
+  const endsAt = now + durationMs;
+  const targetNumber = Number(resultContext.targetNumber);
+  const message = `Игрок ${targetNumber} получает 20 секунд на защиту.`;
+
+  room.gameLog.push(message);
+  room.voting = {
+    ...voting,
+    active: false,
+    status: "defense",
+    defense: {
+      targetNumber,
+      startedAt: now,
+      endsAt,
+      durationMs
+    },
+    result: {
+      type: "defense",
+      reason: resultContext.reason,
+      counts: resultContext.counts,
+      neededVotes: resultContext.neededVotes,
+      alivePlayers: resultContext.alivePlayers,
+      eliminated: null,
+      defenseTarget: targetNumber,
+      message
+    },
+    message
+  };
+
+  room.votingTimer = setTimeout(() => {
+    moveVotingDefenseToDecision(room.roomCode);
+  }, durationMs);
+
+  broadcastRoom(room.roomCode);
+}
+
+function moveVotingDefenseToDecision(roomCode) {
+  const room = rooms.get(roomCode);
+  if (!room?.voting || room.voting.status !== "defense") {
+    return;
+  }
+
+  clearVotingTimer(room);
+
+  const targetNumber = Number(room.voting.defense?.targetNumber);
+  const message = `Защита Игрока ${targetNumber} завершена. Ведущий принимает решение.`;
+  room.gameLog.push(message);
+  room.voting = {
+    ...room.voting,
+    status: "pending-decision",
+    active: false,
+    message,
+    result: {
+      ...(room.voting.result || {}),
+      type: "pending-decision",
+      eliminated: null,
+      defenseTarget: targetNumber,
+      message
+    }
+  };
+
+  broadcastRoom(room.roomCode);
+}
+
+function finalizeVotingDefense(room, decision, reason = "host-decision") {
+  clearVotingTimer(room);
+
+  const voting = room.voting;
+  const targetNumber = Number(voting?.defense?.targetNumber);
+  if (!targetNumber) {
+    return;
+  }
+
+  if (decision === "keep") {
+    const message = `Ведущий оставил Игрока ${targetNumber} в игре`;
+    room.gameLog.push(message);
+    room.voting = {
+      ...voting,
+      active: false,
+      status: "ended",
+      result: {
+        ...(voting.result || {}),
+        type: "kept",
+        reason,
+        eliminated: null,
+        defenseTarget: targetNumber,
+        message
+      },
+      message
+    };
+    broadcastRoom(room.roomCode);
+    return;
+  }
+
+  if (consumeVotingProtection(room, targetNumber)) {
+    const message = `Игрок ${targetNumber} был защищен и не был исключен`;
+    room.gameLog.push(message);
+    room.voting = {
+      ...voting,
+      active: false,
+      status: "ended",
+      result: {
+        ...(voting.result || {}),
+        type: "protected",
+        reason,
+        eliminated: null,
+        protectedPlayer: targetNumber,
+        defenseTarget: targetNumber,
         message
       },
       message
@@ -1477,29 +1661,30 @@ function resolveVotingRound(roomCode, reason = "timer") {
   }
 
   const excluded = new Set((room.excludedPlayers || []).map(Number));
-  excluded.add(eliminated);
+  excluded.add(targetNumber);
   room.excludedPlayers = Array.from(excluded);
+
   const lobby = getLobbyByRoomCode(room.roomCode);
-  if (lobby?.isGameStarted && Number(lobby.currentTurnPlayerNumber) === eliminated) {
-    advanceLobbyTurn(lobby, room, eliminated);
+  if (lobby?.isGameStarted && Number(lobby.currentTurnPlayerNumber) === targetNumber) {
+    advanceLobbyTurn(lobby, room, targetNumber);
     broadcastLobby(room.roomCode);
   }
-  room.gameLog.push(`Исключен Игрок ${eliminated}`);
 
+  const message = `Исключен Игрок ${targetNumber}`;
+  room.gameLog.push(message);
   room.voting = {
     ...voting,
     active: false,
     status: "ended",
     result: {
+      ...(voting.result || {}),
       type: "eliminated",
       reason,
-      counts,
-      neededVotes,
-      alivePlayers,
-      eliminated,
-      message: `Исключен Игрок ${eliminated}`
+      eliminated: targetNumber,
+      defenseTarget: targetNumber,
+      message
     },
-    message: `Голосование завершено: исключен Игрок ${eliminated}`
+    message: `Голосование завершено: исключен Игрок ${targetNumber}`
   };
   broadcastRoom(room.roomCode);
 }
@@ -1645,6 +1830,7 @@ function serializeVoting(room) {
     startedAt: voting.startedAt,
     endsAt: voting.endsAt,
     durationMs: voting.durationMs,
+    defense: voting.defense || null,
     result: voting.result,
     message: voting.message
   };

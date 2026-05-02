@@ -1895,7 +1895,7 @@ function renderCharacters(characters) {
           ${characterTraits.map((trait) => renderTraitRow(character, trait)).join("")}
         </dl>
         ${isHostView() ? `
-          <button class="reveal-all-button" type="button" data-action="reveal-all" data-player="${character.number}" ${isTurnModeActive() ? "disabled" : ""}>
+          <button class="reveal-all-button" type="button" data-action="force-reveal-all" data-player="${character.number}">
             Открыть все
           </button>
           <button class="exclude-button${isExcluded ? " active" : ""}" type="button" data-action="exclude" data-player="${character.number}" ${gameIsOver && !isExcluded ? "disabled" : ""}>
@@ -2027,7 +2027,7 @@ function renderPlayerTableSlot(character, isExcluded, gameIsOver) {
       </div>
       ${isHostView() ? `
         <div class="players-table-host-actions">
-          <button class="trait-mini-action" type="button" data-action="reveal-all" data-player="${character.number}" aria-label="Открыть все Игроку ${character.number}" ${isTurnModeActive() ? "disabled" : ""}>◎</button>
+          <button class="trait-mini-action" type="button" data-action="force-reveal-all" data-player="${character.number}" aria-label="Принудительно открыть все Игроку ${character.number}">◎</button>
           <button class="trait-mini-action exclude-table-action${isExcluded ? " active" : ""}" type="button" data-action="exclude" data-player="${character.number}" aria-label="${isExcluded ? "Вернуть" : "Исключить"} Игрока ${character.number}" ${gameIsOver && !isExcluded ? "disabled" : ""}>${isExcluded ? "↩" : "×"}</button>
         </div>
       ` : ""}
@@ -2093,12 +2093,13 @@ function renderHiddenTraitValue(playerNumber, trait) {
 
 function renderHostHiddenTraitControls(playerNumber, trait) {
   const revealAction = renderTraitRevealAction(playerNumber, trait.key, trait.label);
+  const forceRevealAction = renderHostForceRevealAction(playerNumber, trait.key, trait.label);
   const rerollAction = renderTraitRerollAction(playerNumber, trait.key, trait.label);
 
   return `
     <div class="trait-value-box hidden-host-controls">
       <div class="trait-value-line">
-        <span class="trait-row-actions">${revealAction}${rerollAction}</span>
+        <span class="trait-row-actions">${revealAction}${forceRevealAction}${rerollAction}</span>
       </div>
     </div>
   `;
@@ -2127,6 +2128,9 @@ function renderVisibleTraitValue(character, trait, isPublic, options = {}) {
   const revealAction = !isPublic && canRevealTrait(character.number)
     ? renderTraitRevealAction(character.number, trait.key, trait.label)
     : "";
+  const forceRevealAction = isHostView() && !isPublic
+    ? renderHostForceRevealAction(character.number, trait.key, trait.label)
+    : "";
   const rerollAction = isHostView()
     ? renderTraitRerollAction(character.number, trait.key, trait.label)
     : "";
@@ -2138,7 +2142,7 @@ function renderVisibleTraitValue(character, trait, isPublic, options = {}) {
     <div class="trait-value-box${revealClass}">
       <div class="trait-value-line">
         ${value}
-        <span class="trait-row-actions">${ownStateIndicator}${revealAction}${rerollAction}</span>
+        <span class="trait-row-actions">${ownStateIndicator}${revealAction}${forceRevealAction}${rerollAction}</span>
       </div>
       ${renderVisibilityBadge(character.number, isPublic)}
     </div>
@@ -2545,6 +2549,18 @@ function renderTraitRevealAction(playerNumber, traitKey, label) {
   `;
 }
 
+function renderHostForceRevealAction(playerNumber, traitKey, label) {
+  if (!isHostView()) {
+    return "";
+  }
+
+  return `
+    <button class="trait-lock force-reveal-action" type="button" data-action="force-reveal-trait" data-player="${playerNumber}" data-trait="${traitKey}" aria-label="Принудительно открыть ${label}">
+      👁
+    </button>
+  `;
+}
+
 function renderTraitRerollAction(playerNumber, traitKey, label) {
   return `
     <button class="trait-mini-action" type="button" data-action="reroll-trait" data-player="${playerNumber}" data-trait="${traitKey}" aria-label="Перегенерировать ${label}">
@@ -2902,6 +2918,53 @@ function revealAllTraits(playerNumber) {
 
   setAllTraitsRevealed(playerNumber);
   addGameLog(`Открыты все характеристики Игрока ${playerNumber}`);
+  renderGameLog();
+  renderPack(currentPack);
+}
+
+function forceRevealTrait(playerNumber, traitKey) {
+  if (!isHostView()) {
+    return;
+  }
+
+  if (isOnlineRoom()) {
+    socket.emit("force-reveal-trait", { roomCode: currentRoomCode, playerNumber, traitKey }, (response) => {
+      if (!response?.ok) {
+        setStatus(response?.error || "Не удалось открыть характеристику.", "error");
+      }
+    });
+    return;
+  }
+
+  const wasOpened = setTraitRevealed(playerNumber, traitKey);
+  if (wasOpened) {
+    addGameLog(`Ведущий принудительно открыл ${getTraitAccusative(traitKey)} Игрока ${playerNumber}`);
+    renderGameLog();
+  }
+  renderPack(currentPack);
+}
+
+function forceRevealAllTraits(playerNumber) {
+  if (!isHostView()) {
+    return;
+  }
+
+  const traitKeys = characterTraits.map((trait) => trait.key);
+  if (isOnlineRoom()) {
+    socket.emit("force-reveal-all", {
+      roomCode: currentRoomCode,
+      playerNumber,
+      traitKeys
+    }, (response) => {
+      if (!response?.ok) {
+        setStatus(response?.error || "Не удалось открыть характеристики.", "error");
+      }
+    });
+    return;
+  }
+
+  setAllTraitsRevealed(playerNumber);
+  addGameLog(`Ведущий принудительно открыл все характеристики Игрока ${playerNumber}`);
   renderGameLog();
   renderPack(currentPack);
 }
@@ -3526,22 +3589,46 @@ function applySwapAbility(context) {
   }
 
   if (traitKey === "specialAbility") {
+    const actorWasRevealed = isTraitRevealed(actor.number, traitKey);
+    const targetWasRevealed = isTraitRevealed(target.number, traitKey);
     const actorFirst = actor.specialAbility;
     const actorSecond = actor.specialAbility2;
     actor.specialAbility = target.specialAbility;
     actor.specialAbility2 = target.specialAbility2;
     target.specialAbility = actorFirst;
     target.specialAbility2 = actorSecond;
+    setTraitVisibilityState(actor.number, traitKey, actorWasRevealed);
+    setTraitVisibilityState(target.number, traitKey, targetWasRevealed);
     addGameLog(`Игрок ${context.actorNumber} обменялся способностями с Игроком ${context.targetNumber}`);
     return;
   }
 
+  const actorWasRevealed = isTraitRevealed(actor.number, traitKey);
+  const targetWasRevealed = isTraitRevealed(target.number, traitKey);
   const actorValue = actor[traitKey];
   actor[traitKey] = target[traitKey];
   target[traitKey] = actorValue;
+  setTraitVisibilityState(actor.number, traitKey, actorWasRevealed);
+  setTraitVisibilityState(target.number, traitKey, targetWasRevealed);
   refreshDerivedTraitData(actor, traitKey);
   refreshDerivedTraitData(target, traitKey);
   addGameLog(`Игрок ${context.actorNumber} обменялся ${getTraitInstrumental(traitKey)} с Игроком ${context.targetNumber}`);
+}
+
+function setTraitVisibilityState(playerNumber, traitKey, isRevealed) {
+  const key = Number(playerNumber);
+
+  if (isRevealed) {
+    if (!revealedTraits[key]) {
+      revealedTraits[key] = {};
+    }
+    revealedTraits[key][traitKey] = true;
+    return;
+  }
+
+  if (revealedTraits[key]) {
+    delete revealedTraits[key][traitKey];
+  }
 }
 
 function applyStealAbility(context) {
@@ -3906,6 +3993,14 @@ function openVotingModal(resetSetup = false) {
     return;
   }
 
+  if (["defense", "pending-decision"].includes(votingState?.status)) {
+    votingSetupOpen = false;
+    dismissedVotingId = "";
+    renderVotingModal();
+    votingModal.hidden = false;
+    return;
+  }
+
   if (votingState?.status === "ended") {
     if (resetSetup && isHostView() && isOnlineRoom()) {
       startVotingFromSetup();
@@ -3953,12 +4048,16 @@ function renderVotingModal() {
   }
 
   const isActive = Boolean(votingState.active);
+  const isDefense = votingState.status === "defense";
+  const isPendingDecision = votingState.status === "pending-decision";
   const hasVoted = votingState.voted?.includes(Number(currentPlayerNumber));
   const participantNumbers = new Set((votingState.participants || []).map((player) => Number(player.number)));
   const canVote = isActive && participantNumbers.has(Number(currentPlayerNumber)) && !hasVoted;
 
   votingStatus.textContent = getVotingStatusText(hasVoted);
-  votingList.innerHTML = renderVotingCandidateList(canVote, hasVoted);
+  votingList.innerHTML = isDefense || isPendingDecision
+    ? renderVotingDefensePhase()
+    : renderVotingCandidateList(canVote, hasVoted);
   votingParticipants.innerHTML = renderVotingParticipants();
 
   if (votingState.result) {
@@ -3975,7 +4074,21 @@ function renderVotingModal() {
   votingResetButton.textContent = "Завершить голосование";
   votingResetButton.disabled = false;
 
-  stopVotingCountdown();
+  if (isPendingDecision && isHostView()) {
+    votingFinishButton.hidden = false;
+    votingFinishButton.disabled = false;
+    votingFinishButton.textContent = "Исключить";
+    votingResetButton.hidden = false;
+    votingResetButton.disabled = false;
+    votingResetButton.textContent = "Оставить";
+  }
+
+  if (isDefense && votingState.defense?.endsAt) {
+    votingTimer.hidden = false;
+    startVotingCountdown();
+  } else {
+    stopVotingCountdown();
+  }
 }
 
 function renderVotingSetup() {
@@ -4000,6 +4113,14 @@ function getVotingStatusText(hasVoted) {
     return "Голосование не активно.";
   }
 
+  if (votingState.status === "defense") {
+    return `Защита Игрока ${votingState.defense?.targetNumber || "?"}. Ожидание 20 секунд.`;
+  }
+
+  if (votingState.status === "pending-decision") {
+    return `Защита завершена. Ведущий решает: исключить Игрока ${votingState.defense?.targetNumber || "?"} или оставить.`;
+  }
+
   if (votingState.active) {
     const votedCount = votingState.voted?.length || 0;
     const total = votingState.participants?.length || 0;
@@ -4009,6 +4130,24 @@ function getVotingStatusText(hasVoted) {
   }
 
   return votingState.result?.message || votingState.message || "Голосование завершено.";
+}
+
+function renderVotingDefensePhase() {
+  const targetNumber = Number(votingState?.defense?.targetNumber);
+  const isTarget = targetNumber && Number(currentPlayerNumber) === targetNumber;
+  const isDecision = votingState?.status === "pending-decision";
+
+  return `
+    <article class="voting-defense-card">
+      <div>
+        <strong>Игрок ${targetNumber || "?"}</strong>
+        <span>${isDecision ? "Ожидает решения ведущего" : "Фаза защиты"}</span>
+      </div>
+      <button class="secondary-button voting-defense-button" type="button" ${isTarget && !isDecision ? "" : "disabled"}>
+        Защита
+      </button>
+    </article>
+  `;
 }
 
 function renderVotingCandidateList(canVote, hasVoted) {
@@ -4107,6 +4246,18 @@ function skipVoting() {
   });
 }
 
+function submitVotingDefenseDecision(decision) {
+  if (!isOnlineRoom() || !isHostView()) {
+    return;
+  }
+
+  socket.emit("voting-defense-decision", { roomCode: currentRoomCode, decision }, (response) => {
+    if (!response?.ok) {
+      setStatus(response?.error || "Не удалось принять решение.", "error");
+    }
+  });
+}
+
 function renderVotingFromState() {
   if (!votingState) {
     if (!votingSetupOpen) {
@@ -4116,6 +4267,31 @@ function renderVotingFromState() {
   }
 
   if (votingState.status === "ended") {
+    closeVotingModal();
+    return;
+  }
+
+  if (votingState.status === "defense") {
+    const targetNumber = Number(votingState.defense?.targetNumber);
+    if (isHostView() || Number(currentPlayerNumber) === targetNumber) {
+      votingSetupOpen = false;
+      renderVotingModal();
+      votingModal.hidden = false;
+      return;
+    }
+
+    closeVotingModal();
+    return;
+  }
+
+  if (votingState.status === "pending-decision") {
+    if (isHostView()) {
+      votingSetupOpen = false;
+      renderVotingModal();
+      votingModal.hidden = false;
+      return;
+    }
+
     closeVotingModal();
     return;
   }
@@ -4140,7 +4316,8 @@ function updateVotingTimerText(seconds) {
 function startVotingCountdown() {
   stopVotingCountdown();
   const tick = () => {
-    const remaining = votingState?.endsAt ? (Number(votingState.endsAt) - Date.now()) / 1000 : 0;
+    const endsAt = votingState?.defense?.endsAt || votingState?.endsAt;
+    const remaining = endsAt ? (Number(endsAt) - Date.now()) / 1000 : 0;
     updateVotingTimerText(remaining);
   };
   tick();
@@ -4524,6 +4701,20 @@ characterGrid.addEventListener("click", (event) => {
     );
   }
 
+  if (button.dataset.action === "force-reveal-trait") {
+    if (!isHostView()) {
+      return;
+    }
+
+    showConfirm(
+      "Принудительное открытие",
+      "Открыть эту характеристику всем игрокам?",
+      () => forceRevealTrait(playerNumber, button.dataset.trait),
+      { confirmLabel: "Открыть" }
+    );
+    return;
+  }
+
   if (button.dataset.action === "reroll-trait") {
     rerollTrait(playerNumber, button.dataset.trait);
   }
@@ -4538,6 +4729,19 @@ characterGrid.addEventListener("click", (event) => {
       "Открыть все",
       "Открыть все характеристики этого игрока?",
       () => revealAllTraits(playerNumber)
+    );
+  }
+
+  if (button.dataset.action === "force-reveal-all") {
+    if (!isHostView()) {
+      return;
+    }
+
+    showConfirm(
+      "Принудительно открыть все",
+      "Открыть все характеристики этого игрока всем?",
+      () => forceRevealAllTraits(playerNumber),
+      { confirmLabel: "Открыть все" }
     );
   }
 
@@ -4614,6 +4818,11 @@ votingFinishButton?.addEventListener("click", () => {
     return;
   }
 
+  if (votingState?.status === "pending-decision") {
+    submitVotingDefenseDecision("kick");
+    return;
+  }
+
   if (votingState?.status === "ended") {
     openVotingModal(true);
   }
@@ -4621,6 +4830,11 @@ votingFinishButton?.addEventListener("click", () => {
 votingResetButton?.addEventListener("click", () => {
   if (votingSetupOpen) {
     closeVotingModal();
+    return;
+  }
+
+  if (votingState?.status === "pending-decision") {
+    submitVotingDefenseDecision("keep");
     return;
   }
 

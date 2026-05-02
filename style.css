@@ -834,6 +834,10 @@
   color: rgba(245, 245, 247, 0.48);
 }
 
+.players-table-cell .force-reveal-action {
+  color: rgba(134, 239, 172, 0.86);
+}
+
 .players-table-cell .visibility-badge {
   width: fit-content;
   max-width: 100%;
@@ -1759,7 +1763,8 @@
 }
 
 .voting-candidate-toggle,
-.voting-candidate-card {
+.voting-candidate-card,
+.voting-defense-card {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 10px;
@@ -1771,7 +1776,8 @@
   background: rgba(255, 255, 255, 0.045);
 }
 
-.voting-candidate-card {
+.voting-candidate-card,
+.voting-defense-card {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
@@ -1782,20 +1788,23 @@
 }
 
 .voting-candidate-toggle span,
-.voting-candidate-card div {
+.voting-candidate-card div,
+.voting-defense-card div {
   display: grid;
   gap: 3px;
   min-width: 0;
 }
 
 .voting-candidate-toggle strong,
-.voting-candidate-card strong {
+.voting-candidate-card strong,
+.voting-defense-card strong {
   color: rgba(245, 245, 247, 0.94);
   font-size: 13px;
 }
 
 .voting-candidate-toggle small,
-.voting-candidate-card span {
+.voting-candidate-card span,
+.voting-defense-card span {
   min-width: 0;
   overflow: hidden;
   color: rgba(245, 245, 247, 0.62);
@@ -1807,6 +1816,20 @@
 
 .voting-vote-button {
   min-width: 128px;
+  height: 34px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.voting-defense-card {
+  border-color: rgba(245, 190, 94, 0.28);
+  background:
+    linear-gradient(90deg, rgba(245, 190, 94, 0.12), transparent 70%),
+    rgba(255, 255, 255, 0.045);
+}
+
+.voting-defense-button {
+  min-width: 104px;
   height: 34px;
   padding: 0 12px;
   font-size: 12px;
