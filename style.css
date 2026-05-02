@@ -2372,12 +2372,14 @@ button:focus-visible {
   border-bottom: 2px solid rgba(148, 184, 255, 0.2);
 }
 
-/* Badge wrapper for cell content */
+/* Table characteristic values should read as plain text, not framed badges. */
 .players-table-cell .trait-signal {
-  padding: 3px 7px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.034);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  box-shadow: none;
   min-width: 0;
 }
 

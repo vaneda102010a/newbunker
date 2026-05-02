@@ -32,11 +32,11 @@ const characterTraits = [
 
 const tableTraits = [
   { key: "gender", label: "Пол" },
-  { key: "bodyType", label: "Тип тела" },
-  { key: "trait", label: "Черта" },
   { key: "age", label: "Возраст" },
-  { key: "profession", label: "Профессия" },
   { key: "health", label: "Здоровье" },
+  { key: "trait", label: "Черта" },
+  { key: "bodyType", label: "Тип тела" },
+  { key: "profession", label: "Профессия" },
   { key: "hobby", label: "Хобби" },
   { key: "phobia", label: "Фобия" },
   { key: "largeInventory", label: "Крупное" },
@@ -1994,14 +1994,6 @@ function renderVisibleTraitValue(character, trait, isPublic, options = {}) {
 }
 
 function renderVisibilityBadge(playerNumber, isPublic) {
-  if (isPublic) {
-    return "";
-  }
-
-  if (isOwnPlayer(playerNumber)) {
-    return `<span class="visibility-badge private">Только вы</span>`;
-  }
-
   return "";
 }
 
@@ -2018,7 +2010,7 @@ function getFantasyRaceGenderLines(character) {
     return gender ? [gender] : [];
   }
 
-  return gender ? [race, gender] : [race];
+  return gender ? [gender, race] : [race];
 }
 
 function shouldShowFantasyRaceWithGender(character, trait) {
