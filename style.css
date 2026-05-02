@@ -1715,19 +1715,440 @@
   .title-block h1 {
       font-size: 32px;
     }
-  
+
     .title-block p {
       font-size: 14px;
     }
-  
+
     .stats > .trait-row {
       grid-template-columns: 1fr auto;
     }
-  
+
     .players-table th,
     .players-table td {
       padding: 7px 5px;
       font-size: 10px;
     }
-  
+
+}
+
+/* ================================================================
+   PREMIUM UI — glassmorphism · gradients · glow · motion
+   Appended last; uses CSS cascade to layer over base rules.
+   ================================================================ */
+
+/* — Extended design tokens — */
+:root {
+  --reveal-glow: rgba(180, 205, 228, 0.44);
+  --reveal-glow-strong: rgba(215, 228, 245, 0.6);
+  --glass-blur: 26px;
+  --glass-border: rgba(255, 255, 255, 0.16);
+}
+
+/* ——— Background atmosphere — subtle blue vignette ——— */
+body::before {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(55, 80, 170, 0.16) 0%, transparent 62%),
+    rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+/* ——— Title — gradient text ——— */
+.title-block h1 {
+  background: linear-gradient(
+    135deg,
+    #ffffff 15%,
+    rgba(195, 218, 255, 0.92) 55%,
+    rgba(215, 195, 255, 0.82) 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 30px rgba(150, 185, 255, 0.24));
+}
+
+/* ——— Eyebrow labels — cool blue tint ——— */
+.eyebrow {
+  color: rgba(148, 184, 255, 0.72);
+  letter-spacing: 1.1px;
+}
+
+/* =====  BUTTONS  ===== */
+
+.top-action-button {
+  background: rgba(8, 10, 17, 0.72);
+  border-color: rgba(255, 255, 255, 0.13);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.top-action-button:hover {
+  border-color: rgba(158, 192, 255, 0.38);
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow:
+    0 0 0 1px rgba(158, 192, 255, 0.14),
+    0 0 24px rgba(118, 158, 255, 0.18),
+    0 10px 30px rgba(0, 0, 0, 0.4);
+  transform: translateY(-2px);
+}
+
+.main-button {
+  background: linear-gradient(155deg, #f8f8fa 0%, #e6e6ed 100%);
+  border-color: rgba(255, 255, 255, 0.78);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.22),
+    0 6px 22px rgba(255, 255, 255, 0.13),
+    0 16px 40px rgba(0, 0, 0, 0.38);
+}
+
+.main-button:hover {
+  background: linear-gradient(155deg, #ffffff 0%, #ededf4 100%);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.38),
+    0 0 34px rgba(255, 255, 255, 0.2),
+    0 20px 48px rgba(0, 0, 0, 0.46);
+  transform: translateY(-2px);
+}
+
+.secondary-button:hover,
+.ghost-button:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 22px rgba(255, 255, 255, 0.06);
+}
+
+.role-button {
+  background:
+    linear-gradient(170deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.03) 100%),
+    rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.role-button:hover,
+.role-button.active {
+  border-color: rgba(148, 184, 255, 0.44);
+  background:
+    linear-gradient(170deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.07) 100%),
+    rgba(118, 154, 255, 0.13);
+  box-shadow:
+    0 0 0 1px rgba(148, 184, 255, 0.2),
+    0 0 28px rgba(118, 154, 255, 0.2),
+    0 8px 26px rgba(0, 0, 0, 0.34);
+  transform: translateY(-2px);
+}
+
+.trait-mini-action {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.065);
+}
+
+.trait-mini-action:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.34);
+}
+
+/* =====  PANELS — glassmorphism  ===== */
+
+.overview-panel.info-panel {
+  border-color: var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.018) 100%),
+    rgba(7, 9, 14, 0.76);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.055),
+    0 0 52px rgba(88, 128, 210, 0.1),
+    0 30px 72px rgba(0, 0, 0, 0.52);
+}
+
+.game-log-panel.info-panel {
+  border-color: var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+
+.pack-summary {
+  border-color: rgba(255, 255, 255, 0.15);
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.077) 0%, rgba(255, 255, 255, 0.028) 70%),
+    rgba(7, 9, 14, 0.76);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* =====  TABLE  ===== */
+
+.players-table-wrap,
+.table-container {
+  border-color: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.078) 0%, rgba(255, 255, 255, 0.018) 100%),
+    rgba(5, 7, 12, 0.82);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 0 52px rgba(88, 128, 210, 0.09),
+    0 30px 72px rgba(0, 0, 0, 0.52);
+}
+
+.players-table thead th {
+  background: linear-gradient(180deg, rgba(28, 31, 40, 0.99) 0%, rgba(18, 20, 29, 0.99) 100%);
+  color: rgba(195, 212, 238, 0.84);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  letter-spacing: 0.5px;
+  font-size: 10.5px;
+}
+
+.players-table thead th:first-child {
+  background: linear-gradient(180deg, rgba(28, 31, 40, 0.99) 0%, rgba(18, 20, 29, 0.99) 100%);
+}
+
+.players-table-number {
+  background: rgba(20, 22, 31, 0.98);
+}
+
+/* =====  CHARACTER CARDS  ===== */
+
+.character-card {
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.character-card::before {
+  height: 2px;
+  opacity: 0.9;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent) 22%,
+    color-mix(in srgb, var(--accent) 52%, #ffffff) 50%,
+    var(--accent) 78%,
+    transparent 100%
+  );
+}
+
+.character-card:hover {
+  transform: translateY(-8px) scale(1.012);
+  border-color: color-mix(in srgb, var(--accent) 56%, rgba(255, 255, 255, 0.24));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 68%, transparent),
+    0 0 38px color-mix(in srgb, var(--accent) 48%, transparent),
+    0 38px 84px rgba(0, 0, 0, 0.58);
+}
+
+.number-badge {
+  background: rgba(0, 0, 0, 0.58);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 4px 16px rgba(0, 0, 0, 0.44);
+}
+
+.own-card-badge {
+  background: rgba(0, 0, 0, 0.64);
+  border-color: rgba(255, 255, 255, 0.26);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* =====  ABILITY CARDS  ===== */
+
+.ability-player-card {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-color: rgba(255, 255, 255, 0.11);
+  transition: transform 0.24s ease, box-shadow 0.24s ease, border-color 0.24s ease;
+}
+
+.ability-player-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--accent) 48%, rgba(255, 255, 255, 0.18));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 30px color-mix(in srgb, var(--accent) 24%, transparent),
+    0 18px 44px rgba(0, 0, 0, 0.38);
+}
+
+.ability-player-number {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.ability-panel-button:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 20px color-mix(in srgb, var(--accent) 24%, transparent),
+    0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* =====  MODALS — deep glass  ===== */
+
+.confirm-modal {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 100%),
+    rgba(7, 9, 15, 0.92);
+  border-color: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 0 68px rgba(80, 120, 220, 0.14),
+    0 40px 92px rgba(0, 0, 0, 0.66);
+}
+
+.voting-modal {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 100%),
+    rgba(7, 9, 15, 0.92);
+  border-color: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 0 68px rgba(80, 120, 220, 0.14),
+    0 40px 92px rgba(0, 0, 0, 0.66);
+}
+
+.setup-modal {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 100%),
+    rgba(7, 9, 15, 0.92);
+  border-color: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 0 68px rgba(80, 120, 220, 0.14),
+    0 40px 92px rgba(0, 0, 0, 0.66);
+}
+
+.help-panel {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 100%),
+    rgba(7, 9, 15, 0.92);
+  border-color: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 0 68px rgba(80, 120, 220, 0.14),
+    0 40px 92px rgba(0, 0, 0, 0.66);
+}
+
+/* =====  VIEW TOGGLE  ===== */
+
+.view-toggle {
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.view-toggle-button.active {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 0 20px rgba(148, 184, 255, 0.14);
+}
+
+/* =====  GAME LOG ENTRIES  ===== */
+
+.game-log-list li {
+  border-color: rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.046);
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.game-log-list li:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* =====  VOTING TIMER — glowing display  ===== */
+
+.voting-timer {
+  border-color: rgba(255, 255, 255, 0.22);
+  background:
+    radial-gradient(circle at 50% 15%, rgba(148, 184, 255, 0.26), transparent 68%),
+    rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 0 22px rgba(148, 184, 255, 0.14),
+    0 0 28px rgba(148, 184, 255, 0.18);
+  text-shadow: 0 0 24px rgba(160, 198, 255, 0.58);
+}
+
+/* =====  VISIBILITY BADGES  ===== */
+
+.visibility-badge.private {
+  background: rgba(100, 148, 255, 0.14);
+  border-color: rgba(100, 148, 255, 0.32);
+}
+
+.visibility-badge.public {
+  background: rgba(100, 218, 148, 0.1);
+  border-color: rgba(100, 218, 148, 0.3);
+}
+
+/* =====  SURVIVAL SCORE  ===== */
+
+.survival-score {
+  border-color: rgba(200, 222, 255, 0.28);
+  background:
+    radial-gradient(circle at 50% 20%, rgba(148, 184, 255, 0.24), transparent 66%),
+    rgba(255, 255, 255, 0.05);
+  box-shadow:
+    inset 0 0 30px rgba(148, 184, 255, 0.12),
+    0 0 30px rgba(148, 184, 255, 0.18);
+}
+
+.survival-score strong {
+  text-shadow: 0 0 30px rgba(160, 198, 255, 0.54);
+}
+
+/* =====  SCROLLBARS  ===== */
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* =====  TEXT SELECTION  ===== */
+
+::selection {
+  background: rgba(128, 164, 255, 0.36);
+  color: #ffffff;
+}
+
+/* =====  FOCUS RINGS  ===== */
+
+select:focus,
+input:focus,
+button:focus-visible {
+  outline: 2px solid rgba(148, 184, 255, 0.54);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px rgba(120, 158, 255, 0.14);
 }
