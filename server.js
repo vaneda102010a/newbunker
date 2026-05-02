@@ -1251,6 +1251,29 @@ function resolveVotingRound(roomCode, reason = "timer") {
   }
 
   const eliminated = Number(winnerEntry[0]);
+  if (consumeVotingProtection(room, eliminated)) {
+    const message = `Игрок ${eliminated} был защищен и не был исключен`;
+    room.gameLog.push(message);
+    room.voting = {
+      ...voting,
+      active: false,
+      status: "ended",
+      result: {
+        type: "protected",
+        reason,
+        counts,
+        neededVotes,
+        alivePlayers,
+        eliminated: null,
+        protectedPlayer: eliminated,
+        message
+      },
+      message
+    };
+    broadcastRoom(room.roomCode);
+    return;
+  }
+
   const excluded = new Set((room.excludedPlayers || []).map(Number));
   excluded.add(eliminated);
   room.excludedPlayers = Array.from(excluded);
@@ -1272,6 +1295,33 @@ function resolveVotingRound(roomCode, reason = "timer") {
     message: `Голосование завершено: исключен Игрок ${eliminated}`
   };
   broadcastRoom(room.roomCode);
+}
+
+function consumeVotingProtection(room, playerNumber) {
+  const number = Number(playerNumber);
+  const protectedSet = new Set((room.protectedPlayers || []).map(Number));
+  let protectedByOneTimeState = false;
+
+  if (protectedSet.has(number)) {
+    protectedSet.delete(number);
+    room.protectedPlayers = Array.from(protectedSet);
+    protectedByOneTimeState = true;
+  }
+
+  const packPlayer = (room.generatedPack?.players || []).find((player) => Number(player.number) === number);
+  const roomPlayer = (room.players || []).find((player) => Number(player.playerNumber) === number);
+
+  [packPlayer, roomPlayer].filter(Boolean).forEach((player) => {
+    if (player.protectedUntilNextExclusion || player.avoidExclusion || player.protectedFromExclusion) {
+      protectedByOneTimeState = true;
+    }
+
+    if (player.protectedUntilNextExclusion) player.protectedUntilNextExclusion = false;
+    if (player.avoidExclusion) player.avoidExclusion = false;
+    if (player.protectedFromExclusion) player.protectedFromExclusion = false;
+  });
+
+  return protectedByOneTimeState;
 }
 
 function assignPlayerNumber(room) {
