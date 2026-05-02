@@ -766,7 +766,16 @@ io.on("connection", (socket) => {
 
     const number = Number(playerNumber);
     const excludedSet = new Set(room.excludedPlayers);
+    const protectedSet = new Set(room.protectedPlayers || []);
     if (excluded) {
+      if (protectedSet.has(number)) {
+        protectedSet.delete(number);
+        room.protectedPlayers = Array.from(protectedSet);
+        room.gameLog.push(`Игрок ${number} избежал исключения`);
+        broadcastRoom(room.roomCode);
+        return;
+      }
+
       excludedSet.add(number);
       room.gameLog.push(`Ведущий исключил Игрока ${number}`);
     } else {
@@ -868,6 +877,12 @@ io.on("connection", (socket) => {
 
     if (!room || !player || Number(context?.actorNumber) !== Number(player.playerNumber)) {
       sendReply(reply, { ok: false, error: "Можно использовать только свои способности" });
+      return;
+    }
+
+    const abilityKey = `${Number(context.actorNumber)}:${Number(context.abilityIndex)}`;
+    if (room.usedAbilities?.[abilityKey]) {
+      sendReply(reply, { ok: false, error: "Эта способность уже использована" });
       return;
     }
 

@@ -107,6 +107,25 @@ const cardSections = {
 };
 const requiredCardSections = Object.values(cardSections);
 const repeatAllowedSections = new Set(["Пол", "Тип тела", "Здоровье"]);
+const ABILITY_TARGET_TYPES = {
+  SELF: "self",
+  OTHER_PLAYER: "otherPlayer",
+  ANY_PLAYER: "anyPlayer",
+  NO_TARGET: "noTarget"
+};
+const ABILITY_EFFECT_TYPES = {
+  REVEAL: "reveal",
+  PROTECT: "protect",
+  SWAP: "swap",
+  SWAP_IDENTITY: "swapIdentity",
+  STEAL: "steal",
+  REROLL: "reroll",
+  COPY_TRAIT: "copyTrait",
+  SET_HEALTH: "setHealth",
+  POLYMORPH: "polymorph",
+  NOOP: "noop",
+  UNSUPPORTED: "unsupported"
+};
 
 const themeSelect = document.querySelector("#themeSelect");
 const playerCountSelect = document.querySelector("#playerCountSelect");
@@ -1222,31 +1241,23 @@ function approveAbilityRequest(request) {
     return;
   }
 
-  const context = request.context;
+  const context = prepareAbilityContext(request.context);
   const abilityKey = getAbilityKey(context.actorNumber, context.abilityIndex);
+  const validationError = validateAbilityContext(context);
+
+  if (validationError) {
+    addGameLog(`Запрос способности Игрока ${context.actorNumber} отклонен: ${validationError}`);
+    renderGameLog();
+    syncHostState(request.id);
+    return;
+  }
+
   usedAbilities[abilityKey] = true;
-  addGameLog(`Ведущий подтвердил способность Игрока ${context.actorNumber}`);
+  addGameLog(`Ведущий подтвердил способность Игрока ${context.actorNumber}: ${context.abilityText}`);
   const wasApplied = executeAbility(context);
   renderPack(currentPack);
   renderGameLog();
   syncHostState(request.id);
-  // Notify server about applied ability so it can broadcast to others
-  if (isOnlineRoom() && isHostView() && wasApplied !== false) {
-    const actorName = getRoomPlayerForSlot(context.actorNumber)?.name || `Игрок ${context.actorNumber}`;
-    const abilityText = context.analysis?.raw || context.analysis?.text || (context.traitKey || 'способность');
-    const targetNumber = context.targetNumber || null;
-    const traitKey = context.traitKey || null;
-    const newValue = traitKey ? (getPlayerByNumber(targetNumber)?.[traitKey] || null) : null;
-    socket.emit('ability-applied', {
-      roomCode: currentRoomCode,
-      actorNumber: context.actorNumber,
-      actorName,
-      abilityText,
-      targetNumber,
-      traitKey,
-      newValue
-    });
-  }
 }
 
 function createEmptyCardDatabase() {
@@ -2090,15 +2101,16 @@ function renderAbilitiesPanelCard(character) {
 
 function renderAbilityPanelRow(playerNumber, ability) {
   const label = `Способность ${ability.index + 1}`;
-  const isLocked = !ability.name || !canViewTrait(playerNumber, "specialAbility");
+  const isLocked = !ability.name || !canViewTrait(playerNumber, "specialAbility") || ability.locked;
 
   if (isLocked) {
+    const lockText = ability.name && ability.lockReason ? ability.lockReason : "Откроется позже";
     return `
-      <div class="ability-panel-row locked" title="Откроется позже">
+      <div class="ability-panel-row locked" title="${escapeHtml(lockText)}">
         <span class="ability-panel-label">${label}</span>
-        <button class="ability-panel-button locked" type="button" data-tooltip="Откроется позже" disabled>
+        <button class="ability-panel-button locked" type="button" data-tooltip="${escapeHtml(lockText)}" disabled>
           <span class="ability-panel-icon" aria-hidden="true">&#128274;</span>
-          <span class="ability-panel-name">Откроется позже</span>
+          <span class="ability-panel-name">${escapeHtml(lockText)}</span>
         </button>
       </div>
     `;
@@ -2197,15 +2209,17 @@ function renderSpecialAbilities(character) {
 function renderAbilityCard(playerNumber, ability, abilityIndex) {
   const abilityKey = getAbilityKey(playerNumber, abilityIndex);
   const isUsed = Boolean(usedAbilities[abilityKey]);
+  const analysis = analyzeAbility(ability, playerNumber);
   const presentation = getAbilityPresentation(ability);
   const tooltip = escapeHtml(ability);
-  const isDisabled = isUsed || !canUseAbility(playerNumber);
+  const isLocked = analysis.effectType === ABILITY_EFFECT_TYPES.UNSUPPORTED;
+  const isDisabled = isUsed || isLocked || !canUseAbility(playerNumber);
 
   return `
-    <button class="ability-btn ability-use-button ability-type-${presentation.visualType}${isUsed ? " used" : ""}" type="button" data-action="use-ability" data-player="${playerNumber}" data-ability-index="${abilityIndex}" data-tooltip="${tooltip}" aria-label="${tooltip}" ${isDisabled ? "disabled" : ""}>
+    <button class="ability-btn ability-use-button ability-type-${presentation.visualType}${isUsed ? " used" : ""}${isLocked ? " locked" : ""}" type="button" ${!isDisabled ? `data-action="use-ability" data-player="${playerNumber}" data-ability-index="${abilityIndex}"` : ""} data-tooltip="${isLocked ? "Эта способность пока недоступна" : tooltip}" aria-label="${tooltip}" ${isDisabled ? "disabled" : ""}>
       ${isUsed
         ? `<span class="ability-used-mark" aria-hidden="true">✓</span><span class="ability-label">Использовано</span>`
-        : `<span class="ability-icon" aria-hidden="true">${presentation.icon}</span><span class="ability-label">${escapeHtml(presentation.label)}</span>`}
+        : `<span class="ability-icon" aria-hidden="true">${presentation.icon}</span><span class="ability-label">${escapeHtml(isLocked ? "Недоступно" : presentation.label)}</span>`}
     </button>
   `;
 }
@@ -2217,10 +2231,16 @@ function getAbilityPresentation(abilityText) {
   const visualType = getAbilityVisualType(logicType, lowerText);
   const icons = {
     swap: "🔄",
+    swapIdentity: "🔄",
     steal: "👜",
     reveal: "👁",
     reroll: "🎲",
-    defense: "🛡",
+    protect: "🛡",
+    copyTrait: "⧉",
+    setHealth: "✚",
+    polymorph: "✦",
+    noop: "•",
+    unsupported: "⊘",
     global: "🌐"
   };
 
@@ -2232,7 +2252,7 @@ function getAbilityPresentation(abilityText) {
 }
 
 function getAbilityVisualType(logicType, lowerText) {
-  if (lowerText.includes("все характеристики") || logicType === "manual") {
+  if (lowerText.includes("все характеристики") || logicType === ABILITY_EFFECT_TYPES.UNSUPPORTED || logicType === ABILITY_EFFECT_TYPES.NOOP) {
     return "global";
   }
 
@@ -2242,11 +2262,11 @@ function getAbilityVisualType(logicType, lowerText) {
 function getAbilityShortLabel(lowerText, logicType) {
   const traitKey = inferTraitKey(lowerText);
 
-  if (logicType === "defense") {
+  if (logicType === ABILITY_EFFECT_TYPES.PROTECT) {
     return lowerText.includes("избежать") ? "Иммунитет" : "Щит";
   }
 
-  if (logicType === "steal") {
+  if (logicType === ABILITY_EFFECT_TYPES.STEAL) {
     if (traitKey === "backpack") {
       return "Украсть рюкзак";
     }
@@ -2258,15 +2278,19 @@ function getAbilityShortLabel(lowerText, logicType) {
     return "Украсть";
   }
 
-  if (logicType === "swap") {
+  if (logicType === ABILITY_EFFECT_TYPES.SWAP) {
     return `Обмен ${getAbilityTraitGenitiveLabel(traitKey)}`;
   }
 
-  if (logicType === "reroll") {
+  if (logicType === ABILITY_EFFECT_TYPES.SWAP_IDENTITY) {
+    return "Обмен пола/расы";
+  }
+
+  if (logicType === ABILITY_EFFECT_TYPES.REROLL) {
     return `Переген ${getAbilityTraitGenitiveLabel(traitKey)}`;
   }
 
-  if (logicType === "reveal") {
+  if (logicType === ABILITY_EFFECT_TYPES.REVEAL) {
     if (lowerText.includes("все характеристики")) {
       return "Открыть все";
     }
@@ -2280,6 +2304,22 @@ function getAbilityShortLabel(lowerText, logicType) {
     }
 
     return `Раскрыть ${getTraitAccusative(traitKey)}`;
+  }
+
+  if (logicType === ABILITY_EFFECT_TYPES.COPY_TRAIT) {
+    return "Скопировать";
+  }
+
+  if (logicType === ABILITY_EFFECT_TYPES.SET_HEALTH) {
+    return "Исцелить";
+  }
+
+  if (logicType === ABILITY_EFFECT_TYPES.POLYMORPH) {
+    return "Полиморф";
+  }
+
+  if (logicType === ABILITY_EFFECT_TYPES.NOOP) {
+    return "Пустышка";
   }
 
   return "Способность";
@@ -2409,12 +2449,21 @@ function getPlayerAbilityItems(player) {
 
   return [player?.specialAbility, player?.specialAbility2].map((rawAbility, index) => {
     const id = getAbilityKey(playerNumber, index);
+    const name = cleanText(rawAbility, "").trim();
+    const analysis = analyzeAbility(name, playerNumber);
 
     return {
       id,
       index,
-      name: cleanText(rawAbility, "").trim(),
-      used: Boolean(usedAbilities[id])
+      name,
+      description: name,
+      targetType: analysis.targetType,
+      effectType: analysis.effectType,
+      used: Boolean(usedAbilities[id]),
+      locked: !name || analysis.effectType === ABILITY_EFFECT_TYPES.UNSUPPORTED,
+      lockReason: analysis.effectType === ABILITY_EFFECT_TYPES.UNSUPPORTED
+        ? "Эта способность пока недоступна"
+        : ""
     };
   });
 }
@@ -2426,37 +2475,40 @@ function getPlayerByNumber(playerNumber) {
 function analyzeAbility(abilityText, actorNumber) {
   const text = cleanText(abilityText, "");
   const lowerText = text.toLowerCase();
-  const direction = lowerText.includes("слева")
-    ? "left"
-    : lowerText.includes("справа")
-      ? "right"
-      : "";
-  const autoTargetNumber = direction ? getNeighborPlayerNumber(actorNumber, direction) : null;
+  const direction = lowerText.includes("рядом")
+    ? "nearby"
+    : lowerText.includes("слева")
+      ? "left"
+      : lowerText.includes("справа") || lowerText.includes("с права")
+        ? "right"
+        : "";
+  const autoTargetNumber = ["left", "right"].includes(direction) ? getNeighborPlayerNumber(actorNumber, direction) : null;
   const traitKey = inferTraitKey(lowerText);
   const revealAll = lowerText.includes("все характеристики");
   const explicitTarget = lowerText.includes("выбран")
     || lowerText.includes("другим игроком")
+    || lowerText.includes("другого игрока")
     || lowerText.includes("одного игрока")
     || lowerText.includes("одному")
-    || lowerText.includes("двух игроков");
+    || lowerText.includes("двух игроков")
+    || lowerText.includes("игрока")
+    || lowerText.includes("игроком");
   const type = detectAbilityType(lowerText);
-  const needsTarget = !autoTargetNumber
-    && type !== "defense"
-    && (
-      type === "steal"
-      || type === "swap"
-      || type === "reveal"
-      || (type === "reroll" && explicitTarget)
-      || (type === "manual" && explicitTarget)
-    );
-  const needsTrait = !revealAll && !traitKey && ["reveal", "reroll", "swap"].includes(type);
+  const targetType = inferAbilityTargetType(type, lowerText, explicitTarget, autoTargetNumber);
+  const needsTarget = !autoTargetNumber && [ABILITY_TARGET_TYPES.OTHER_PLAYER, ABILITY_TARGET_TYPES.ANY_PLAYER].includes(targetType);
+  const needsTrait = shouldAbilityAskForTrait(type, traitKey, revealAll);
 
   return {
+    id: normalizeAbilityId(text),
+    raw: text,
+    text,
     type,
+    effectType: type,
     traitKey,
     revealAll,
     direction,
     autoTargetNumber,
+    targetType,
     needsTarget,
     needsTrait,
     explicitTarget
@@ -2464,27 +2516,93 @@ function analyzeAbility(abilityText, actorNumber) {
 }
 
 function detectAbilityType(lowerText) {
+  if (!lowerText) {
+    return ABILITY_EFFECT_TYPES.UNSUPPORTED;
+  }
+
+  if (includesAny(lowerText, ["бесполез"])) {
+    return ABILITY_EFFECT_TYPES.NOOP;
+  }
+
+  if (includesAny(lowerText, ["скопировать"])) {
+    return ABILITY_EFFECT_TYPES.COPY_TRAIT;
+  }
+
+  if (includesAny(lowerText, ["исцеление", "до состояния здоров", "меняет здоровье"])) {
+    return ABILITY_EFFECT_TYPES.SET_HEALTH;
+  }
+
+  if (includesAny(lowerText, ["полиморф", "возрастом и типом тела"])) {
+    return ABILITY_EFFECT_TYPES.POLYMORPH;
+  }
+
+  if (includesAny(lowerText, ["превращение", "меняется пол", "пол и расу"])) {
+    return ABILITY_EFFECT_TYPES.SWAP_IDENTITY;
+  }
+
+  if (includesAny(lowerText, ["защитить выбран", "защитить игрок"])) {
+    return ABILITY_EFFECT_TYPES.PROTECT;
+  }
+
   if (includesAny(lowerText, ["защититься", "избежать"])) {
-    return "defense";
+    return ABILITY_EFFECT_TYPES.PROTECT;
   }
 
   if (includesAny(lowerText, ["украсть"])) {
-    return "steal";
+    return ABILITY_EFFECT_TYPES.STEAL;
   }
 
   if (includesAny(lowerText, ["обменяться", "поменяться", "обменять", "поменять"])) {
-    return "swap";
+    return ABILITY_EFFECT_TYPES.SWAP;
   }
 
   if (includesAny(lowerText, ["перегенерировать"])) {
-    return "reroll";
+    return ABILITY_EFFECT_TYPES.REROLL;
   }
 
-  if (includesAny(lowerText, ["заставить", "раскрыть", "открыть"])) {
-    return "reveal";
+  if (includesAny(lowerText, ["заставить", "раскрыть", "открыть", "открывашка"])) {
+    return ABILITY_EFFECT_TYPES.REVEAL;
   }
 
-  return "manual";
+  return ABILITY_EFFECT_TYPES.UNSUPPORTED;
+}
+
+function normalizeAbilityId(abilityText) {
+  return cleanText(abilityText, "")
+    .toLowerCase()
+    .replaceAll("ё", "е")
+    .replace(/[^a-zа-я0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function inferAbilityTargetType(effectType, lowerText, explicitTarget, autoTargetNumber) {
+  if (autoTargetNumber) {
+    return ABILITY_TARGET_TYPES.OTHER_PLAYER;
+  }
+
+  if (effectType === ABILITY_EFFECT_TYPES.PROTECT) {
+    return includesAny(lowerText, ["защитить выбран", "защитить игрок"])
+      ? ABILITY_TARGET_TYPES.ANY_PLAYER
+      : ABILITY_TARGET_TYPES.SELF;
+  }
+
+  if ([ABILITY_EFFECT_TYPES.STEAL, ABILITY_EFFECT_TYPES.SWAP, ABILITY_EFFECT_TYPES.SWAP_IDENTITY, ABILITY_EFFECT_TYPES.REVEAL, ABILITY_EFFECT_TYPES.COPY_TRAIT, ABILITY_EFFECT_TYPES.POLYMORPH].includes(effectType)) {
+    return ABILITY_TARGET_TYPES.OTHER_PLAYER;
+  }
+
+  if ([ABILITY_EFFECT_TYPES.REROLL, ABILITY_EFFECT_TYPES.SET_HEALTH].includes(effectType)) {
+    return explicitTarget ? ABILITY_TARGET_TYPES.ANY_PLAYER : ABILITY_TARGET_TYPES.SELF;
+  }
+
+  return ABILITY_TARGET_TYPES.NO_TARGET;
+}
+
+function shouldAbilityAskForTrait(effectType, traitKey, revealAll) {
+  if (effectType === ABILITY_EFFECT_TYPES.COPY_TRAIT) {
+    return true;
+  }
+
+  return !revealAll && !traitKey && [ABILITY_EFFECT_TYPES.REVEAL, ABILITY_EFFECT_TYPES.REROLL, ABILITY_EFFECT_TYPES.SWAP].includes(effectType);
 }
 
 function includesAny(text, keywords) {
@@ -2516,6 +2634,26 @@ function inferTraitKey(lowerText) {
     return "hobby";
   }
 
+  if (lowerText.includes("черта")) {
+    return "trait";
+  }
+
+  if (lowerText.includes("возраст")) {
+    return "age";
+  }
+
+  if (lowerText.includes("пол") && !lowerText.includes("полиморф")) {
+    return "gender";
+  }
+
+  if (lowerText.includes("тип тела") || lowerText.includes("телослож")) {
+    return "bodyType";
+  }
+
+  if (lowerText.includes("инфо") || lowerText.includes("информац")) {
+    return "additionalInfo";
+  }
+
   if (lowerText.includes("способност") || lowerText.includes("спец.")) {
     return "specialAbility";
   }
@@ -2538,12 +2676,17 @@ function getNeighborPlayerNumber(actorNumber, direction) {
 
 function getAbilityTitle(type) {
   const titles = {
-    swap: "Обмен",
-    steal: "Кража",
-    reveal: "Раскрытие",
-    reroll: "Перегенерация",
-    defense: "Защита",
-    manual: "Способность"
+    [ABILITY_EFFECT_TYPES.SWAP]: "Обмен",
+    [ABILITY_EFFECT_TYPES.SWAP_IDENTITY]: "Превращение",
+    [ABILITY_EFFECT_TYPES.STEAL]: "Кража",
+    [ABILITY_EFFECT_TYPES.REVEAL]: "Раскрытие",
+    [ABILITY_EFFECT_TYPES.REROLL]: "Перегенерация",
+    [ABILITY_EFFECT_TYPES.PROTECT]: "Защита",
+    [ABILITY_EFFECT_TYPES.COPY_TRAIT]: "Копирование",
+    [ABILITY_EFFECT_TYPES.SET_HEALTH]: "Лечение",
+    [ABILITY_EFFECT_TYPES.POLYMORPH]: "Полиморф",
+    [ABILITY_EFFECT_TYPES.NOOP]: "Способность",
+    [ABILITY_EFFECT_TYPES.UNSUPPORTED]: "Недоступно"
   };
 
   return titles[type] || "Способность";
@@ -2816,9 +2959,20 @@ function openAbilityModal(playerNumber, abilityIndex) {
   }
 
   const player = getPlayerByNumber(playerNumber);
-  const abilityText = getPlayerAbilityItems(player)[abilityIndex]?.name;
+  const ability = getPlayerAbilityItems(player)[abilityIndex];
+  const abilityText = ability?.name;
 
   if (!player || !abilityText) {
+    return;
+  }
+
+  if (ability.locked) {
+    setStatus(ability.lockReason || "Эта способность недоступна.", "error");
+    return;
+  }
+
+  if (ability.used) {
+    setStatus("Эта способность уже использована.", "error");
     return;
   }
 
@@ -2833,7 +2987,9 @@ function openAbilityModal(playerNumber, abilityIndex) {
   abilityPlayerLabel.textContent = `Игрок ${playerNumber} · ${getAbilityTitle(analysis.type)}`;
   abilityTitle.textContent = abilityText;
   abilityDescription.textContent = abilityText;
-  abilityAdminNote.textContent = isHostView() ? "" : "Способность будет применена локально";
+  abilityAdminNote.textContent = isOnlineRoom() && !isHostView()
+    ? "Запрос уйдет ведущему на подтверждение"
+    : "";
 
   renderAbilityTargetControls();
   updateAbilityTraitOptions();
@@ -2853,14 +3009,15 @@ function openAbilityModal(playerNumber, abilityIndex) {
 function renderAbilityTargetControls() {
   const { analysis, actorNumber } = pendingAbility;
   const autoTargetNumber = analysis.autoTargetNumber;
-  const showAutoTarget = Boolean(autoTargetNumber);
+  const selfTargetNumber = analysis.targetType === ABILITY_TARGET_TYPES.SELF ? actorNumber : null;
+  const showAutoTarget = Boolean(autoTargetNumber || selfTargetNumber);
 
   abilityTargetField.hidden = !analysis.needsTarget;
   abilityTargetHint.hidden = !showAutoTarget;
   abilityTargetSelect.innerHTML = "";
 
   if (showAutoTarget) {
-    abilityTargetHint.textContent = `Цель: Игрок ${autoTargetNumber}`;
+    abilityTargetHint.textContent = `Цель: Игрок ${autoTargetNumber || selfTargetNumber}`;
   }
 
   if (!analysis.needsTarget) {
@@ -2877,7 +3034,14 @@ function renderAbilityTargetControls() {
 function getTargetOptions(actorNumber, analysis) {
   const players = currentPack?.players || [];
 
-  if (["swap", "steal"].includes(analysis.type)) {
+  if (analysis.direction === "nearby") {
+    const left = getNeighborPlayerNumber(actorNumber, "left");
+    const right = getNeighborPlayerNumber(actorNumber, "right");
+    const allowed = new Set([left, right].filter(Boolean).map(Number));
+    return players.filter((player) => allowed.has(Number(player.number)));
+  }
+
+  if (analysis.targetType === ABILITY_TARGET_TYPES.OTHER_PLAYER) {
     return players.filter((player) => player.number !== Number(actorNumber));
   }
 
@@ -2907,7 +3071,17 @@ function updateAbilityTraitOptions() {
 }
 
 function getTraitOptionsForAbility(analysis, targetNumber) {
-  if (analysis.type === "reveal" && targetNumber) {
+  if (analysis.type === ABILITY_EFFECT_TYPES.COPY_TRAIT) {
+    if (!targetNumber) {
+      return [];
+    }
+
+    return characterTraits
+      .filter((trait) => trait.key !== "specialAbility" && cardSections[trait.key])
+      .filter((trait) => isTraitRevealed(targetNumber, trait.key));
+  }
+
+  if (analysis.type === ABILITY_EFFECT_TYPES.REVEAL && targetNumber) {
     const hiddenTraits = characterTraits.filter((trait) => !isTraitRevealed(targetNumber, trait.key));
     return hiddenTraits.length > 0 ? hiddenTraits : characterTraits;
   }
@@ -2938,6 +3112,14 @@ function getPendingTargetNumber() {
     return analysis.autoTargetNumber;
   }
 
+  if (analysis.targetType === ABILITY_TARGET_TYPES.SELF) {
+    return actorNumber;
+  }
+
+  if (analysis.targetType === ABILITY_TARGET_TYPES.NO_TARGET) {
+    return null;
+  }
+
   if (analysis.needsTarget) {
     return Number(abilityTargetSelect.value) || null;
   }
@@ -2945,21 +3127,99 @@ function getPendingTargetNumber() {
   return actorNumber;
 }
 
+function prepareAbilityContext(context) {
+  const actorNumber = Number(context.actorNumber);
+  const abilityIndex = Number(context.abilityIndex);
+  const player = getPlayerByNumber(actorNumber);
+  const abilityText = getPlayerAbilityItems(player)[abilityIndex]?.name || cleanText(context.abilityText, "");
+  const analysis = analyzeAbility(abilityText, actorNumber);
+
+  return {
+    ...context,
+    actorNumber,
+    abilityIndex,
+    abilityText,
+    analysis,
+    targetNumber: Number(context.targetNumber) || null,
+    traitKey: analysis.traitKey || context.traitKey || ""
+  };
+}
+
+function validateAbilityContext(context) {
+  const actor = getPlayerByNumber(context.actorNumber);
+  const target = context.targetNumber ? getPlayerByNumber(context.targetNumber) : null;
+  const ability = getPlayerAbilityItems(actor)[context.abilityIndex];
+  const abilityKey = getAbilityKey(context.actorNumber, context.abilityIndex);
+  const analysis = context.analysis;
+
+  if (!actor || !ability?.name) {
+    return "Способность не найдена.";
+  }
+
+  if (ability.locked || analysis.effectType === ABILITY_EFFECT_TYPES.UNSUPPORTED) {
+    return ability.lockReason || "Эта способность недоступна.";
+  }
+
+  if (usedAbilities[abilityKey]) {
+    return "Эта способность уже использована.";
+  }
+
+  if (analysis.targetType === ABILITY_TARGET_TYPES.SELF && context.targetNumber !== context.actorNumber) {
+    return "Эта способность применяется только к себе.";
+  }
+
+  if (analysis.targetType === ABILITY_TARGET_TYPES.NO_TARGET && context.targetNumber) {
+    return "Этой способности не нужна цель.";
+  }
+
+  if ([ABILITY_TARGET_TYPES.OTHER_PLAYER, ABILITY_TARGET_TYPES.ANY_PLAYER].includes(analysis.targetType)) {
+    if (!target) {
+      return "Выберите корректную цель.";
+    }
+
+    if (analysis.targetType === ABILITY_TARGET_TYPES.OTHER_PLAYER && Number(target.number) === Number(context.actorNumber)) {
+      return "Эта способность не может выбрать самого себя.";
+    }
+
+    const allowedTargets = getTargetOptions(context.actorNumber, analysis).map((player) => Number(player.number));
+    if (!allowedTargets.includes(Number(target.number))) {
+      return "Эта цель недоступна для способности.";
+    }
+  }
+
+  if (analysis.needsTrait) {
+    const allowedTraits = getTraitOptionsForAbility(analysis, context.targetNumber).map((trait) => trait.key);
+    if (!context.traitKey || !allowedTraits.includes(context.traitKey)) {
+      return "Выберите корректную характеристику.";
+    }
+  }
+
+  return "";
+}
+
 function confirmAbilityUse() {
   if (!pendingAbility || abilityConfirmButton.disabled) {
     return;
   }
 
-  const context = {
+  const context = prepareAbilityContext({
     ...pendingAbility,
     targetNumber: getPendingTargetNumber(),
     traitKey: pendingAbility.analysis.traitKey || abilityTraitSelect.value || ""
-  };
+  });
   const abilityKey = getAbilityKey(context.actorNumber, context.abilityIndex);
 
   if (!canUseAbility(context.actorNumber)) {
     setStatus("Можно использовать только свои способности.", "error");
     closeAbilityModal();
+    return;
+  }
+
+  const validationError = validateAbilityContext(context);
+  if (validationError) {
+    setStatus(validationError, "error");
+    closeAbilityModal();
+    renderPack(currentPack);
     return;
   }
 
@@ -2977,7 +3237,7 @@ function confirmAbilityUse() {
   }
 
   usedAbilities[abilityKey] = true;
-  addGameLog(`Игрок ${context.actorNumber} использовал способность`);
+  addGameLog(`Игрок ${context.actorNumber} использовал способность: ${context.abilityText}`);
 
   const wasApplied = executeAbility(context);
   closeAbilityModal();
@@ -2996,47 +3256,81 @@ function executeAbility(context) {
     return false;
   }
 
-  if (context.analysis.type === "swap") {
+  if (context.analysis.effectType === ABILITY_EFFECT_TYPES.SWAP) {
     applySwapAbility(context);
     // highlight swapped trait cells
     highlightTraitCell(context.actorNumber, context.traitKey);
+    highlightTraitCell(context.targetNumber, context.traitKey);
     return true;
   }
 
-  if (context.analysis.type === "steal") {
+  if (context.analysis.effectType === ABILITY_EFFECT_TYPES.SWAP_IDENTITY) {
+    applySwapIdentityAbility(context);
+    ["gender", "age"].forEach((traitKey) => {
+      highlightTraitCell(context.actorNumber, traitKey);
+      highlightTraitCell(context.targetNumber, traitKey);
+    });
+    return true;
+  }
+
+  if (context.analysis.effectType === ABILITY_EFFECT_TYPES.STEAL) {
     applyStealAbility(context);
     highlightTraitCell(context.actorNumber, context.traitKey);
+    highlightTraitCell(context.targetNumber, context.traitKey);
     return true;
   }
 
-  if (context.analysis.type === "reveal") {
+  if (context.analysis.effectType === ABILITY_EFFECT_TYPES.REVEAL) {
     applyRevealAbility(context);
     // reveal may highlight multiple traits; highlight the revealed trait if provided
     if (context.traitKey) highlightTraitCell(context.targetNumber || context.actorNumber, context.traitKey);
     return true;
   }
 
-  if (context.analysis.type === "reroll") {
+  if (context.analysis.effectType === ABILITY_EFFECT_TYPES.REROLL) {
     applyRerollAbility(context);
     if (context.traitKey) highlightTraitCell(context.targetNumber || context.actorNumber, context.traitKey);
     return true;
   }
 
-  if (context.analysis.type === "defense") {
+  if (context.analysis.effectType === ABILITY_EFFECT_TYPES.PROTECT) {
     applyDefenseAbility(context);
     // defense doesn't change a visible trait but show notification
-    highlightTraitCell(context.actorNumber, 'specialAbility');
+    highlightTraitCell(context.targetNumber || context.actorNumber, 'specialAbility');
     return true;
   }
 
-  addGameLog(`Способность Игрока ${context.actorNumber} требует ручного применения`);
-  return true;
+  if (context.analysis.effectType === ABILITY_EFFECT_TYPES.COPY_TRAIT) {
+    applyCopyTraitAbility(context);
+    highlightTraitCell(context.actorNumber, context.traitKey);
+    return true;
+  }
+
+  if (context.analysis.effectType === ABILITY_EFFECT_TYPES.SET_HEALTH) {
+    applySetHealthAbility(context);
+    highlightTraitCell(context.targetNumber || context.actorNumber, "health");
+    return true;
+  }
+
+  if (context.analysis.effectType === ABILITY_EFFECT_TYPES.POLYMORPH) {
+    applyPolymorphAbility(context);
+    ["gender", "bodyType", "age"].forEach((traitKey) => highlightTraitCell(context.targetNumber, traitKey));
+    return true;
+  }
+
+  if (context.analysis.effectType === ABILITY_EFFECT_TYPES.NOOP) {
+    addGameLog(`Способность Игрока ${context.actorNumber} не дала эффекта`);
+    return true;
+  }
+
+  addGameLog(`Способность Игрока ${context.actorNumber} пока не реализована`);
+  return false;
 }
 
 function isAbilityBlockedByDefense(context) {
   const targetNumber = context.targetNumber;
 
-  if (!targetNumber || targetNumber === context.actorNumber || context.analysis.type === "defense") {
+  if (!targetNumber || targetNumber === context.actorNumber || context.analysis.effectType === ABILITY_EFFECT_TYPES.PROTECT) {
     return false;
   }
 
@@ -3057,6 +3351,17 @@ function applySwapAbility(context) {
 
   if (!actor || !target || !traitKey) {
     addGameLog(`Обмен Игрока ${context.actorNumber} требует ручного применения`);
+    return;
+  }
+
+  if (traitKey === "specialAbility") {
+    const actorFirst = actor.specialAbility;
+    const actorSecond = actor.specialAbility2;
+    actor.specialAbility = target.specialAbility;
+    actor.specialAbility2 = target.specialAbility2;
+    target.specialAbility = actorFirst;
+    target.specialAbility2 = actorSecond;
+    addGameLog(`Игрок ${context.actorNumber} обменялся способностями с Игроком ${context.targetNumber}`);
     return;
   }
 
@@ -3147,8 +3452,80 @@ function applyRerollAbility(context) {
 }
 
 function applyDefenseAbility(context) {
-  protectedPlayers.add(context.actorNumber);
-  addGameLog(`Игрок ${context.actorNumber} защитился от следующей способности`);
+  const targetNumber = context.targetNumber || context.actorNumber;
+  protectedPlayers.add(Number(targetNumber));
+  addGameLog(`Игрок ${targetNumber} защищен от следующей способности или исключения`);
+}
+
+function applyCopyTraitAbility(context) {
+  const actor = getPlayerByNumber(context.actorNumber);
+  const target = getPlayerByNumber(context.targetNumber);
+  const traitKey = context.traitKey;
+
+  if (!actor || !target || !traitKey || !isTraitRevealed(target.number, traitKey)) {
+    addGameLog(`Копирование Игрока ${context.actorNumber} требует открытую характеристику цели`);
+    return;
+  }
+
+  actor[traitKey] = target[traitKey];
+  refreshDerivedTraitData(actor, traitKey);
+  addGameLog(`Игрок ${context.actorNumber} скопировал ${getTraitAccusative(traitKey)} Игрока ${context.targetNumber}`);
+}
+
+function applySetHealthAbility(context) {
+  const target = getPlayerByNumber(context.targetNumber || context.actorNumber);
+
+  if (!target) {
+    addGameLog(`Лечение Игрока ${context.actorNumber} требует корректную цель`);
+    return;
+  }
+
+  target.health = "Здоров";
+  refreshDerivedTraitData(target, "health");
+  addGameLog(`Игрок ${context.actorNumber} изменил здоровье Игрока ${target.number} на Здоров`);
+}
+
+function applySwapIdentityAbility(context) {
+  const actor = getPlayerByNumber(context.actorNumber);
+  const target = getPlayerByNumber(context.targetNumber);
+
+  if (!actor || !target) {
+    addGameLog(`Превращение Игрока ${context.actorNumber} требует корректную цель`);
+    return;
+  }
+
+  ["gender", "race"].forEach((key) => {
+    const actorValue = actor[key];
+    actor[key] = target[key];
+    target[key] = actorValue;
+  });
+  addGameLog(`Игрок ${context.actorNumber} обменялся полом и расой с Игроком ${context.targetNumber}`);
+}
+
+function applyPolymorphAbility(context) {
+  const target = getPlayerByNumber(context.targetNumber);
+
+  if (!target) {
+    addGameLog(`Полиморф Игрока ${context.actorNumber} требует корректную цель`);
+    return;
+  }
+
+  const race = drawCard("Раса", createDrawState());
+  const gender = getThemeGenderByRace(race, drawReplacementTrait("gender", target.gender));
+  target.race = race && race !== "Не указано" ? race : target.race;
+  target.gender = gender || target.gender;
+  target.age = formatAbilityAge(getThemeAgeByRace(target.race || target.gender, randomInt(18, 80)));
+  target.bodyType = drawReplacementTrait("bodyType", target.bodyType);
+  addGameLog(`Игрок ${context.actorNumber} применил полиморф к Игроку ${target.number}`);
+}
+
+function formatAbilityAge(ageValue) {
+  if (typeof ageValue === "number") {
+    return `${ageValue} ${getRussianYearWord(ageValue)}`;
+  }
+
+  const text = cleanText(ageValue, "");
+  return text || generateAge();
 }
 
 function mergeStolenItem(currentValue, stolenValue) {
