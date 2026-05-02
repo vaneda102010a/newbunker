@@ -1035,7 +1035,7 @@ function getRoomPlayer(room, socketId) {
 }
 
 function canReveal(player, playerNumber) {
-  return Number(player.playerNumber) === Number(playerNumber);
+  return player.isHost || Number(player.playerNumber) === Number(playerNumber);
 }
 
 function setTraitRevealed(room, playerNumber, traitKey) {

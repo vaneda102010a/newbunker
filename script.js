@@ -677,7 +677,7 @@ function isOnlineRoom() {
 }
 
 function canRevealTrait(playerNumber) {
-  return isOwnPlayer(playerNumber);
+  return isHostView() || isOwnPlayer(playerNumber);
 }
 
 function canUseAbility(playerNumber) {
@@ -1966,12 +1966,13 @@ function renderHiddenTraitValue(playerNumber, trait) {
 }
 
 function renderHostHiddenTraitControls(playerNumber, trait) {
+  const revealAction = renderTraitRevealAction(playerNumber, trait.key, trait.label);
   const rerollAction = renderTraitRerollAction(playerNumber, trait.key, trait.label);
 
   return `
     <div class="trait-value-box hidden-host-controls">
       <div class="trait-value-line">
-        <span class="trait-row-actions">${rerollAction}</span>
+        <span class="trait-row-actions">${revealAction}${rerollAction}</span>
       </div>
     </div>
   `;
@@ -3980,9 +3981,13 @@ characterGrid.addEventListener("click", (event) => {
       return;
     }
 
+    const confirmMessage = isHostView()
+      ? "Ведущий хочет открыть эту характеристику?"
+      : "Открыть эту характеристику?";
+
     showConfirm(
       "Открытие характеристики",
-      "Открыть эту характеристику?",
+      confirmMessage,
       () => revealTrait(playerNumber, button.dataset.trait)
     );
   }
