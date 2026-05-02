@@ -10,17 +10,42 @@
 </head>
 <body>
   <section class="start-screen" id="startScreen" aria-label="Главное меню">
-    <div class="start-panel">
-      <span class="eyebrow">Бункер</span>
-      <h1>Bunker Game</h1>
+    <video class="start-video" src="/images/start.mp4" autoplay muted loop playsinline aria-hidden="true"></video>
+    <div class="start-overlay" aria-hidden="true"></div>
+
+    <div class="start-menu">
+      <div class="start-logo">
+        <p class="start-logo-sub">&#8212; THE VOTING PROTOCOL &#8212;</p>
+        <h1 class="start-logo-title">BUNKER</h1>
+      </div>
 
       <div class="start-actions">
-        <button class="main-button" id="startCreateButton" type="button">Создать игру</button>
-        <button class="secondary-button" id="startJoinButton" type="button">Присоединиться к игре</button>
+        <button class="start-menu-button" id="startCreateButton" type="button">
+          <svg class="start-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          <span>Создать игру</span>
+        </button>
+        <button class="start-menu-button start-menu-button--join" id="startJoinButton" type="button">
+          <svg class="start-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <span>Присоединиться к игре</span>
+        </button>
       </div>
 
       <p class="start-status" id="startStatus" role="status" aria-live="polite"></p>
-      <button class="start-test-button" id="startDevTestButton" type="button">Быстрый тест</button>
+
+      <button class="start-test-button" id="startDevTestButton" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" width="13" height="13">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+        </svg>
+        Быстрый тест
+      </button>
     </div>
   </section>
 
@@ -418,5 +443,18 @@
   <script src="data.js"></script>
   <script src="script.js"></script>
   <script type="module" src="/core/engine.js"></script>
+  <script>
+    /* Pause/resume start video with screen visibility */
+    (function () {
+      const vid = document.querySelector('.start-video');
+      if (!vid) return;
+      const screen = document.getElementById('startScreen');
+      if (!screen) return;
+      const obs = new MutationObserver(function () {
+        if (screen.hidden) { vid.pause(); } else { vid.play().catch(function(){}); }
+      });
+      obs.observe(screen, { attributes: true, attributeFilter: ['hidden'] });
+    })();
+  </script>
 </body>
 </html>
