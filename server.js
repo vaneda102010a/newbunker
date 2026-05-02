@@ -144,8 +144,30 @@ function getCurrentPlayer(lobby, room = rooms.get(normalizeRoomCode(lobby?.roomC
   return getCurrentTurnEntry(lobby, room)?.lobbyPlayer || null;
 }
 
+function ensureTurnStateStarted(lobby, room) {
+  if (!lobby || !room?.generatedPack?.players?.length) {
+    return null;
+  }
+
+  const activeEntries = getActiveTurnEntries(lobby, room);
+  if (activeEntries.length === 0) {
+    lobby.currentTurnIndex = 0;
+    lobby.currentTurnPlayerNumber = null;
+    return null;
+  }
+
+  if (!lobby.isGameStarted) {
+    lobby.state = "IN_GAME";
+    lobby.isGameStarted = true;
+    lobby.roundNumber = Number(lobby.roundNumber) || 1;
+    lobby.currentTurnStartedAt = Date.now();
+  }
+
+  return getCurrentTurnEntry(lobby, room);
+}
+
 function serializeLobby(lobby, room = rooms.get(normalizeRoomCode(lobby?.roomCode))) {
-  const currentEntry = getCurrentTurnEntry(lobby, room);
+  const currentEntry = ensureTurnStateStarted(lobby, room);
   const roomPlayersBySocket = new Map((room?.players || []).map((player) => [player.socketId, player]));
   
   return {
@@ -837,16 +859,19 @@ io.on("connection", (socket) => {
     reconcilePlayerSlots(room);
     const lobby = getLobbyByRoomCode(room.roomCode);
     if (lobby) {
+      lobby.state = "IN_GAME";
+      lobby.isGameStarted = true;
       lobby.currentTurnIndex = 0;
-      lobby.currentTurnPlayerNumber = null;
       lobby.roundNumber = 1;
-      lobby.currentTurnStartedAt = null;
+      lobby.currentTurnStartedAt = Date.now();
       lobby.players.forEach((player) => {
         player.hasRevealedThisTurn = false;
       });
+      const firstTurn = getActiveTurnEntries(lobby, room)[0] || null;
+      lobby.currentTurnPlayerNumber = firstTurn?.playerNumber || null;
     }
-    broadcastRoom(room.roomCode);
     broadcastLobby(room.roomCode);
+    broadcastRoom(room.roomCode);
   });
 
   socket.on("reveal-trait", ({ roomCode, playerNumber, traitKey } = {}, reply) => {
@@ -862,8 +887,9 @@ io.on("connection", (socket) => {
 
     const requestedPlayerNumber = Number(playerNumber);
 
+    const currentEntry = ensureTurnStateStarted(lobby, room);
+
     if (lobby?.isGameStarted) {
-      const currentEntry = getCurrentTurnEntry(lobby, room);
       if (
         !currentEntry ||
         currentEntry.roomPlayer.socketId !== socket.id ||
@@ -879,15 +905,32 @@ io.on("connection", (socket) => {
       return;
     }
 
-    setTraitRevealed(room, requestedPlayerNumber, traitKey);
+    const wasHidden = setTraitRevealed(room, requestedPlayerNumber, traitKey);
+    if (!wasHidden) {
+      sendReply(reply, { ok: false, error: "Эта характеристика уже открыта" });
+      return;
+    }
+
     room.gameLog.push(`Открыта характеристика Игрока ${requestedPlayerNumber}: ${getTraitAccusative(traitKey)}`);
 
     if (lobby?.isGameStarted) {
       advanceLobbyTurn(lobby, room, requestedPlayerNumber);
-      broadcastLobby(room.roomCode);
     }
 
-    sendReply(reply, { ok: true });
+    const nextEntry = lobby?.isGameStarted ? getCurrentTurnEntry(lobby, room) : null;
+    const turnPayload = nextEntry
+      ? {
+        nextPlayerIndex: lobby.currentTurnIndex,
+        nextPlayerId: nextEntry.lobbyPlayer?.id || null,
+        nextPlayerNumber: nextEntry.playerNumber,
+        roundNumber: lobby.roundNumber || 1
+      }
+      : null;
+
+    sendReply(reply, { ok: true, turn: turnPayload });
+    if (lobby?.isGameStarted) {
+      broadcastLobby(room.roomCode);
+    }
     broadcastRoom(room.roomCode);
   });
 
@@ -1232,14 +1275,16 @@ function canReveal(player, playerNumber) {
 
 function setTraitRevealed(room, playerNumber, traitKey) {
   if (!traitKey) {
-    return;
+    return false;
   }
 
   if (!room.revealedTraits[playerNumber]) {
     room.revealedTraits[playerNumber] = {};
   }
 
+  const wasHidden = !room.revealedTraits[playerNumber][traitKey];
   room.revealedTraits[playerNumber][traitKey] = true;
+  return wasHidden;
 }
 
 function getTraitAccusative(traitKey) {

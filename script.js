@@ -997,7 +997,7 @@ function initializeSocket() {
 
   socket.on('turnChanged', (payload) => {
     try {
-      // payload contains nextPlayerIndex and nextPlayerId
+      applyTurnPayload(payload);
       updateControlAvailability();
     } catch (e) {}
   });
@@ -1153,6 +1153,39 @@ function applyLobbyState(lobby) {
     renderPack(currentPack);
   }
   updateControlAvailability();
+}
+
+function applyTurnPayload(payload = {}) {
+  if (!currentLobby || !payload) {
+    return;
+  }
+
+  const nextPlayerNumber = Number(payload.nextPlayerNumber);
+  if (nextPlayerNumber) {
+    currentLobby.currentTurnPlayerNumber = nextPlayerNumber;
+  }
+
+  if (payload.nextPlayerId) {
+    currentLobby.currentPlayerId = payload.nextPlayerId;
+  } else if (nextPlayerNumber) {
+    const nextPlayer = (currentLobby.players || []).find((player) => Number(player.playerNumber) === nextPlayerNumber);
+    currentLobby.currentPlayerId = nextPlayer?.id || currentLobby.currentPlayerId;
+  }
+
+  if (Number.isFinite(Number(payload.nextPlayerIndex))) {
+    currentLobby.currentTurnIndex = Number(payload.nextPlayerIndex);
+  }
+
+  if (Number(payload.roundNumber)) {
+    currentLobby.roundNumber = Number(payload.roundNumber);
+  }
+
+  currentLobby.isGameStarted = true;
+  currentLobby.state = "IN_GAME";
+
+  if (currentPack?.players?.length) {
+    renderPack(currentPack);
+  }
 }
 
 // Notifications (simple toast)
@@ -2817,6 +2850,11 @@ function revealTrait(playerNumber, traitKey) {
     socket.emit("reveal-trait", { roomCode: currentRoomCode, playerNumber, traitKey }, (response) => {
       if (response && !response.ok) {
         setStatus(response.error || "Сейчас нельзя открыть характеристику.", "error");
+        return;
+      }
+
+      if (response?.turn) {
+        applyTurnPayload(response.turn);
       }
     });
     return;
