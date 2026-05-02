@@ -500,7 +500,7 @@ function updateControlAvailability() {
     document.querySelectorAll('[data-action]').forEach((btn) => {
       try {
         const action = btn.dataset.action;
-        if (action === 'use-ability') {
+        if (action === 'use-ability' || action === 'use-basic-ability') {
           // abilities are allowed even out of turn
           btn.disabled = false;
         } else {
@@ -1517,20 +1517,10 @@ function renderCharacters(characters) {
 
 function renderPlayersTable(characters) {
   const gameIsOver = isGameOver();
-  const themeId = currentPack?.settings?.theme || currentPack?.themeId || themeSelect?.value || DEFAULT_THEME_ID;
-  const isClassicTheme = getThemeById(themeId).id === "classic";
 
-  // Build visible table traits; for Classic theme merge Gender + Age into a single column
   const visibleTableTraits = [];
   for (const trait of tableTraits) {
     if (trait.key === "specialAbility" || trait.key === "specialAbility2") continue;
-    if (isClassicTheme && trait.key === "gender") {
-      visibleTableTraits.push({ key: "gender_age", label: "Пол / Возраст" });
-      continue;
-    }
-    if (isClassicTheme && trait.key === "age") {
-      continue;
-    }
     visibleTableTraits.push(trait);
   }
   const table = document.createElement("div");
@@ -1556,22 +1546,10 @@ function renderPlayersTable(characters) {
   `;
 
   characterGrid.append(table);
-  // Render abilities sub-table below the main players table
   const abilitiesHtml = `
-    <div class="abilities-table-wrap table-container">
-      <div class="table-wrapper">
-        <table class="abilities-table players-table">
-          <thead>
-            <tr>
-              ${characters.map((ch) => `<th scope="col">${escapeHtml(getTablePlayerTitle(ch))}</th>`).join("")}
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              ${characters.map((ch) => `<td class="abilities-cell" data-player="${ch.number}">${renderSpecialAbilities(ch)}</td>`).join("")}
-            </tr>
-          </tbody>
-        </table>
+    <div class="abilities-panel-wrap table-container">
+      <div class="abilities-panel">
+        ${characters.map((character) => renderAbilitiesPanelCard(character)).join("")}
       </div>
     </div>
   `;
@@ -1588,18 +1566,6 @@ function renderPlayerTableRow(character, gameIsOver, visibleTableTraits = tableT
     <tr class="${isExcluded ? "excluded" : ""}${isOwn ? " own-row" : ""}" style="--accent: ${character.accent}" data-player="${character.number}">
       <td class="players-table-player" title="${escapeHtml(playerTitle)}">${renderPlayerTableSlot(character, isExcluded, gameIsOver)}</td>
       ${visibleTableTraits.map((trait, columnIndex) => {
-        if (trait.key === "gender_age") {
-          const gender = cleanText(character.gender, "--");
-          const age = cleanText(character.age, "--");
-          const titleText = `${gender}, ${age}`;
-          const innerHtml = `<span class="gender-line">${escapeHtml(gender)}</span><br><span class="age-line">${escapeHtml(age)}</span>`;
-          return `
-            <td class="players-table-cell trait-gender_age${isNewlyRevealedTrait(character.number, 'gender') || isNewlyRevealedTrait(character.number, 'age') ? " revealed-now-cell" : ""}" data-column="${columnIndex + 1}" title="${escapeHtml(titleText)}">
-              ${renderTraitSignal(innerHtml, getTraitTone(character, { key: 'age' }))}
-            </td>
-          `;
-        }
-
         return `
           <td class="players-table-cell trait-${trait.key}${isNewlyRevealedTrait(character.number, trait.key) ? " revealed-now-cell" : ""}" data-column="${columnIndex + 1}" title="${escapeHtml(getTableTraitTitle(character, trait))}">
             ${renderTraitValue(character, trait, { view: VIEW_TABLE })}
@@ -1616,15 +1582,6 @@ function getTablePlayerTitle(character) {
 }
 
 function getTableTraitTitle(character, trait) {
-  if (trait.key === "gender_age") {
-    const genderVisible = canViewTrait(character.number, 'gender');
-    const ageVisible = canViewTrait(character.number, 'age');
-    if (!genderVisible && !ageVisible) return "🔒";
-    const gender = genderVisible ? cleanText(character.gender, "--") : "--";
-    const age = ageVisible ? cleanText(character.age, "--") : "--";
-    return `${gender}, ${age}`;
-  }
-
   if (!canViewTrait(character.number, trait.key)) {
     return "🔒";
   }
@@ -1649,10 +1606,6 @@ function getTableTraitTitle(character, trait) {
 function getTableTraitLabel(trait) {
   if (trait.key === "gender" && isFantasyPackActive()) {
     return "Пол / Раса";
-  }
-
-  if (trait.key === "gender_age") {
-    return "Пол/Возр.";
   }
 
   return trait.label;
@@ -1846,6 +1799,58 @@ function renderTraitSignal(content, tone) {
     <span class="trait-signal">
       ${content}
     </span>
+  `;
+}
+
+function renderAbilitiesPanelCard(character) {
+  const playerName = getTablePlayerTitle(character);
+  const abilityItems = getPlayerAbilityItems(character);
+  const isOwn = isOwnPlayer(character.number);
+
+  return `
+    <article class="ability-player-card${isOwn ? " own-ability-card" : ""}" style="--accent: ${character.accent}" data-player="${character.number}">
+      <header class="ability-player-header">
+        <span class="ability-player-number">${character.number}</span>
+        <h3>${escapeHtml(playerName)}</h3>
+      </header>
+      <div class="ability-player-list">
+        ${abilityItems.map((ability) => renderAbilityPanelRow(character.number, ability)).join("")}
+      </div>
+    </article>
+  `;
+}
+
+function renderAbilityPanelRow(playerNumber, ability) {
+  const label = `Способность ${ability.index + 1}`;
+  const isLocked = !ability.name || !canViewTrait(playerNumber, "specialAbility");
+
+  if (isLocked) {
+    return `
+      <div class="ability-panel-row locked" title="Откроется позже">
+        <span class="ability-panel-label">${label}</span>
+        <button class="ability-panel-button locked" type="button" data-tooltip="Откроется позже" disabled>
+          <span class="ability-panel-icon" aria-hidden="true">&#128274;</span>
+          <span class="ability-panel-name">Откроется позже</span>
+        </button>
+      </div>
+    `;
+  }
+
+  const canUse = canUseAbility(playerNumber);
+  const isDisabled = ability.used || !canUse;
+  const actionAttrs = !isDisabled
+    ? `data-action="use-basic-ability" data-player="${playerNumber}" data-ability-index="${ability.index}"`
+    : "";
+  const tooltip = ability.used ? "Уже использовано" : ability.name;
+
+  return `
+    <div class="ability-panel-row${ability.used ? " used" : ""}">
+      <span class="ability-panel-label">${label}</span>
+      <button class="ability-panel-button${ability.used ? " used" : ""}" type="button" ${actionAttrs} data-tooltip="${escapeHtml(tooltip)}" aria-label="${escapeHtml(ability.name)}" ${isDisabled ? "disabled" : ""}>
+        <span class="ability-panel-icon" aria-hidden="true">${ability.used ? "&#10003;" : "&#9889;"}</span>
+        <span class="ability-panel-name">${escapeHtml(ability.used ? "Использовано" : ability.name)}</span>
+      </button>
+    </div>
   `;
 }
 
@@ -2129,6 +2134,21 @@ function getPlayerAbilities(player) {
 
 function getAbilityKey(playerNumber, abilityIndex) {
   return `${playerNumber}:${abilityIndex}`;
+}
+
+function getPlayerAbilityItems(player) {
+  const playerNumber = Number(player?.number);
+
+  return [player?.specialAbility, player?.specialAbility2].map((rawAbility, index) => {
+    const id = getAbilityKey(playerNumber, index);
+
+    return {
+      id,
+      index,
+      name: cleanText(rawAbility, "").trim(),
+      used: Boolean(usedAbilities[id])
+    };
+  });
 }
 
 function getPlayerByNumber(playerNumber) {
@@ -2520,6 +2540,36 @@ function canCalculateSurvival() {
 
 function getRemainingPlayers() {
   return currentPack.players.filter((player) => !excludedPlayers.has(player.number));
+}
+
+function requestBasicAbilityUse(playerNumber, abilityIndex) {
+  const player = getPlayerByNumber(playerNumber);
+  const ability = getPlayerAbilityItems(player)[abilityIndex];
+
+  if (!ability?.name || ability.used || !canUseAbility(playerNumber)) {
+    return;
+  }
+
+  showConfirm(
+    "Использовать способность?",
+    ability.name,
+    () => markBasicAbilityUsed(playerNumber, abilityIndex),
+    { confirmLabel: "Да", cancelLabel: "Нет" }
+  );
+}
+
+function markBasicAbilityUsed(playerNumber, abilityIndex) {
+  const player = getPlayerByNumber(playerNumber);
+  const ability = getPlayerAbilityItems(player)[abilityIndex];
+
+  if (!ability?.name || ability.used || !canUseAbility(playerNumber)) {
+    return;
+  }
+
+  usedAbilities[ability.id] = true;
+  addGameLog(`Игрок ${playerNumber} использовал способность: ${ability.name}`);
+  renderPack(currentPack);
+  renderGameLog();
 }
 
 function openAbilityModal(playerNumber, abilityIndex) {
@@ -3666,6 +3716,15 @@ characterGrid.addEventListener("click", (event) => {
   // removed health-info tooltip handling (tooltip element was removed)
 
   const playerNumber = Number(button.dataset.player);
+
+  if (button.dataset.action === "use-basic-ability") {
+    if (button.disabled) {
+      return;
+    }
+
+    requestBasicAbilityUse(playerNumber, Number(button.dataset.abilityIndex));
+    return;
+  }
 
   if (button.dataset.action === "use-ability") {
     if (button.disabled) {

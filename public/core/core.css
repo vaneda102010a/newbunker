@@ -795,24 +795,6 @@ button:focus-visible {
   -webkit-backdrop-filter: blur(8px);
 }
 
-/* Compact Gender/Age column: narrow, center-aligned, two-line clamp */
-.players-table td.trait-gender_age {
-  text-align: center;
-  max-width: 80px;
-  width: 80px;
-  white-space: normal;
-  word-break: break-word;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-.players-table col.players-table-gender_age-col {
-  width: 100px;
-}
-
 .setup-modal-backdrop {
   position: fixed;
   inset: 0;
