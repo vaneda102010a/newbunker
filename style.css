@@ -794,22 +794,26 @@
 }
 
 .players-table-cell .trait-value-box {
-  display: grid;
-  gap: 3px;
-  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-height: 104px;
 }
 
 .players-table-cell .trait-value-line {
   position: relative;
-  display: block;
-  align-items: start;
-  min-height: 20px;
-  padding-right: 28px;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  min-height: 0;
+  padding-right: 0;
   overflow: visible;
 }
 
 .players-table-cell.trait-health .trait-value-line {
-  padding-right: 58px;
+  padding-right: 0;
 }
 
 .players-table-cell .trait-signal,
@@ -820,15 +824,19 @@
 }
 
 .players-table-cell .trait-row-actions {
-  position: absolute;
-  top: 0;
-  right: 0;
+  position: static;
   display: inline-flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  align-self: flex-start;
+  justify-content: flex-start;
   gap: 4px;
+  margin-top: auto;
   margin-left: 0;
   padding-top: 0;
+}
+
+.players-table-cell .trait-row-actions:empty {
+  display: none;
 }
 
 .players-table-cell .trait-mini-action,
@@ -878,18 +886,19 @@
 
 .players-table-cell .hidden-player-controls .trait-value-line,
 .players-table-cell .hidden-host-controls .trait-value-line {
-  display: grid;
-  grid-template-columns: auto;
-  justify-content: center;
-  min-height: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 104px;
   padding-right: 0;
 }
 
 .players-table-cell .hidden-player-controls .trait-row-actions,
 .players-table-cell .hidden-host-controls .trait-row-actions {
   position: static;
-  justify-self: center;
-  margin: 0;
+  align-self: flex-start;
+  margin-top: auto;
+  margin-left: 0;
 }
 
 .players-table-cell .ability-buttons {
