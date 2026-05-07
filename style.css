@@ -3213,21 +3213,21 @@ button:focus-visible {
 }
 
 /* ── Percentage column widths (12 cols, total = 100%) ── */
-/* player(12) + gender(6) + bodyType(6.5) + trait(7) + age(5) +
-   profession(8.5) + health(13) + hobby(7.5) + phobia(7.5) +
-   largeInventory(7.5) + backpack(7.5) + additionalInfo(12) = 100% */
-.players-table-player-col         { width: 12%;  }
+/* player(10) + gender(6) + bodyType(6.5) + trait(7) + age(5) +
+   profession(8.5) + health(14) + hobby(7.5) + phobia(7.5) +
+   largeInventory(7.5) + backpack(7.5) + additionalInfo(13) = 100% */
+.players-table-player-col         { width: 10%;  }
 .players-table-gender-col         { width: 6%;   }
 .players-table-bodyType-col       { width: 6.5%; }
 .players-table-trait-col          { width: 7%;   }
 .players-table-age-col            { width: 5%;   }
 .players-table-profession-col     { width: 8.5%; }
-.players-table-health-col         { width: 13%;  }
+.players-table-health-col         { width: 14%;  }
 .players-table-hobby-col          { width: 7.5%; }
 .players-table-phobia-col         { width: 7.5%; }
 .players-table-largeInventory-col { width: 7.5%; }
 .players-table-backpack-col       { width: 7.5%; }
-.players-table-additionalInfo-col { width: 12%;  }
+.players-table-additionalInfo-col { width: 13%;  }
 
 /* ── Content inside cells ── */
 
