@@ -675,7 +675,7 @@
   text-align: left;
   letter-spacing: 0.3px;
   text-transform: uppercase;
-  font-size: 11px;
+  font-size: 14px;
   color: rgba(245, 245, 247, 0.52);
 }
 
@@ -717,15 +717,19 @@
 }
 
 .players-table-slot {
-  display: grid;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 104px;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .players-table-player-main {
   display: grid;
-  gap: 6px;
+  gap: 7px;
+  align-content: start;
   min-width: 0;
 }
 
@@ -2507,7 +2511,7 @@ button:focus-visible {
 
 /* Number column — accent glow */
 .players-table-number {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 900;
   text-shadow: 0 0 18px color-mix(in srgb, var(--accent, #8ab4ff) 70%, transparent);
 }
@@ -3193,41 +3197,51 @@ button:focus-visible {
   width: 100%;
   min-width: 0;
   table-layout: fixed;
-  font-size: 13px;
-  line-height: 1.3;
+  font-size: 15px;
+  line-height: 1.34;
 }
 
 /* Cells: compact padding, full word-wrap, no min-width forcing overflow */
 .players-table th,
 .players-table td {
-  padding: 5px 6px;
+  height: auto;
+  padding: 8px 8px;
   min-width: 0;
-  font-size: 13px;
-  line-height: 1.3;
+  font-size: 15px;
+  line-height: 1.34;
   white-space: normal;
   overflow-wrap: break-word;
   word-break: break-word;
   hyphens: auto;
-  overflow: hidden;
+  overflow: visible;
   vertical-align: top;
 }
 
+.players-table thead th {
+  font-size: 14px;
+  line-height: 1.24;
+  overflow: visible;
+  overflow-wrap: break-word;
+  text-overflow: clip;
+  white-space: normal;
+}
+
 /* ── Percentage column widths (12 cols, total = 100%) ── */
-/* player(10) + gender(6) + bodyType(6.5) + trait(7) + age(5) +
-   profession(8.5) + health(14) + hobby(7.5) + phobia(7.5) +
-   largeInventory(7.5) + backpack(7.5) + additionalInfo(13) = 100% */
-.players-table-player-col         { width: 10%;  }
+/* player(9.5) + gender(6) + bodyType(6.5) + trait(7) + age(5) +
+   profession(9) + health(13) + hobby(7.5) + phobia(7.5) +
+   largeInventory(7.5) + backpack(7.5) + additionalInfo(14) = 100% */
+.players-table-player-col         { width: 9.5%; }
 .players-table-gender-col         { width: 6%;   }
 .players-table-bodyType-col       { width: 6.5%; }
 .players-table-trait-col          { width: 7%;   }
 .players-table-age-col            { width: 5%;   }
-.players-table-profession-col     { width: 8.5%; }
-.players-table-health-col         { width: 14%;  }
+.players-table-profession-col     { width: 9%;   }
+.players-table-health-col         { width: 13%;  }
 .players-table-hobby-col          { width: 7.5%; }
 .players-table-phobia-col         { width: 7.5%; }
 .players-table-largeInventory-col { width: 7.5%; }
 .players-table-backpack-col       { width: 7.5%; }
-.players-table-additionalInfo-col { width: 13%;  }
+.players-table-additionalInfo-col { width: 14%;  }
 
 /* ── Content inside cells ── */
 
@@ -3236,7 +3250,7 @@ button:focus-visible {
   flex: 1 1 0;
   min-width: 0;
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .players-table-cell .health-value {
@@ -3244,51 +3258,51 @@ button:focus-visible {
   min-width: 0;
 }
 
-/* Trait values: 3-line clamp, wrap */
+/* Trait values: use the cell height before falling back to wrapping. */
 .players-table-cell .trait-value {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  overflow-wrap: break-word;
+  display: block;
+  overflow: visible;
+  overflow-wrap: anywhere;
   word-break: break-word;
   white-space: normal;
   max-width: 100%;
 }
 
-/* Stacked variant: same clamping */
+/* Stacked variant: wrap lines instead of truncating them. */
 .players-table-cell .trait-value-stacked {
-  overflow: hidden;
+  display: grid;
+  gap: 2px;
+  overflow: visible;
 }
 
 .players-table-cell .trait-value-stacked span {
   display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
 }
 
-/* Ability label: 2-line clamp */
+/* Ability label: wrap in table cells instead of clamping early. */
 .players-table-cell .ability-label {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  display: block;
+  overflow: visible;
+  overflow-wrap: anywhere;
   white-space: normal;
-  font-size: 12px;
+  font-size: 14px;
   max-width: 100%;
 }
 
-/* Player name: 2-line clamp */
+/* Player name: wrap naturally in the narrower player column. */
 .players-table-player-name {
-  font-size: 14px;
+  font-size: 16px;
   white-space: normal;
   overflow-wrap: break-word;
   word-break: break-word;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  display: block;
+  -webkit-line-clamp: unset;
+  -webkit-box-orient: initial;
+  overflow: visible;
 }
 
 /* Status/visibility badges: truncate, don't expand */
@@ -3297,6 +3311,11 @@ button:focus-visible {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.players-table-host-actions {
+  align-self: flex-start;
+  margin-top: auto;
 }
 
 .players-table-cell .visibility-badge {
@@ -3315,7 +3334,7 @@ button:focus-visible {
    need at least this width to be usable */
 @media (max-width: 900px) {
   .players-table {
-    min-width: 700px;
+    min-width: 780px;
   }
 
   .players-table-wrap,
@@ -3327,15 +3346,11 @@ button:focus-visible {
 
 /* Player accent consistency: table rows reuse the same --accent as ability cards. */
 .players-table tbody tr > td {
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--accent, #8ab4ff) 11%, transparent), transparent 72%),
-    rgba(255, 255, 255, 0.018);
+  background: rgba(13, 15, 19, 0.82);
 }
 
 .players-table tbody tr:nth-child(even) > td {
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--accent, #8ab4ff) 13%, transparent), transparent 72%),
-    rgba(255, 255, 255, 0.028);
+  background: rgba(18, 20, 25, 0.86);
 }
 
 .players-table tbody tr > .players-table-player {
@@ -3350,12 +3365,10 @@ button:focus-visible {
 
 .players-table tbody tr.own-row > td,
 .players-table tbody tr.own-row > th {
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--accent, #8ab4ff) 24%, transparent), transparent 74%),
-    rgba(255, 255, 255, 0.042);
+  background: rgba(20, 23, 29, 0.9);
   box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--accent, #8ab4ff) 18%, transparent),
-    0 0 22px color-mix(in srgb, var(--accent, #8ab4ff) 12%, transparent);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .players-table tbody tr.own-row > .players-table-player {
@@ -3369,9 +3382,8 @@ button:focus-visible {
 
 .players-table tr.row-hover > td {
   box-shadow:
-    inset 0 0 0 999px color-mix(in srgb, var(--accent, #8ab4ff) 10%, transparent),
-    inset 0 0 0 1px color-mix(in srgb, var(--accent, #8ab4ff) 20%, transparent),
-    0 0 18px color-mix(in srgb, var(--accent, #8ab4ff) 12%, transparent);
+    inset 0 0 0 999px rgba(255, 255, 255, 0.045),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07);
 }
 
 @keyframes currentTurnGlow {
