@@ -450,9 +450,7 @@
 }
 
 .players-table tbody tr.own-row {
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--accent) 24%, transparent), transparent 52%),
-    rgba(255, 255, 255, 0.052);
+  background: rgba(255, 255, 255, 0.036);
 }
 
 .turn-banner {
@@ -672,16 +670,20 @@
 .players-table thead th:first-child {
   position: sticky;
   left: 0;
-  z-index: 4;
-  background: rgba(18, 18, 22, 0.98);
-  text-align: center;
+  z-index: 5;
+  background: rgba(12, 12, 17, 0.99);
+  text-align: left;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  font-size: 11px;
+  color: rgba(245, 245, 247, 0.52);
 }
 
 .players-table-number {
   position: sticky;
   left: 0;
   z-index: 4;
-  background: rgba(18, 18, 22, 0.98);
+  background: rgba(12, 12, 17, 0.99);
   color: color-mix(in srgb, var(--accent) 76%, var(--text));
   font-size: 15px;
   font-weight: 800;
@@ -689,59 +691,83 @@
 }
 
 .players-table-player {
-  background: rgba(20, 20, 24, 0.96);
-  box-shadow: 2px 0 0 rgba(255, 255, 255, 0.07);
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background:
+    linear-gradient(160deg,
+      color-mix(in srgb, var(--accent) 14%, rgba(4, 5, 9, 0.98)),
+      rgba(4, 5, 9, 0.99));
+  border-left: 3px solid color-mix(in srgb, var(--accent) 44%, transparent);
+  box-shadow:
+    inset 0 0 22px color-mix(in srgb, var(--accent) 10%, transparent),
+    2px 0 14px rgba(0, 0, 0, 0.55);
+  transition: background 0.28s ease, border-color 0.28s ease, box-shadow 0.28s ease;
+}
+
+.players-table tbody tr.own-row .players-table-player {
+  background:
+    linear-gradient(160deg,
+      color-mix(in srgb, var(--accent) 26%, rgba(4, 5, 9, 0.96)),
+      rgba(4, 5, 9, 0.97));
+  border-left: 3px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  box-shadow:
+    inset 0 0 34px color-mix(in srgb, var(--accent) 18%, transparent),
+    2px 0 16px rgba(0, 0, 0, 0.55);
 }
 
 .players-table-slot {
   display: grid;
-  gap: 5px;
+  gap: 8px;
   min-width: 0;
   overflow: hidden;
 }
 
 .players-table-player-main {
   display: grid;
-  gap: 5px;
+  gap: 6px;
   min-width: 0;
 }
 
 .players-table-player-name {
   min-width: 0;
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 800;
+  color: color-mix(in srgb, var(--accent) 88%, rgba(245, 245, 247, 0.95));
+  font-size: 15px;
+  font-weight: 820;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  line-height: 1.3;
+  line-height: 1.25;
   white-space: normal;
-  letter-spacing: 0.1px;
+  letter-spacing: 0.15px;
+  text-shadow: 0 0 18px color-mix(in srgb, var(--accent) 32%, transparent);
 }
 
 .players-table-slot-status {
   width: fit-content;
   max-width: 100%;
-  padding: 2px 6px;
+  padding: 3px 8px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, rgba(255, 255, 255, 0.07));
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.045);
-  color: var(--muted-2);
+  background: color-mix(in srgb, var(--accent) 8%, rgba(255, 255, 255, 0.03));
+  color: color-mix(in srgb, var(--accent) 50%, rgba(245, 245, 247, 0.52));
   font-size: 10px;
-  font-weight: 760;
+  font-weight: 780;
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .players-table-slot-status.own {
-  color: rgba(185, 212, 255, 0.88);
+  border-color: color-mix(in srgb, var(--accent) 54%, rgba(255, 255, 255, 0.14));
+  background: color-mix(in srgb, var(--accent) 16%, rgba(255, 255, 255, 0.05));
+  color: color-mix(in srgb, var(--accent) 82%, rgba(245, 245, 247, 0.9));
 }
 
 .players-table-slot-status.occupied {
-  color: rgba(183, 232, 196, 0.86);
+  color: rgba(183, 232, 196, 0.82);
 }
 
 .players-table-host-actions {
@@ -3381,19 +3407,17 @@ button:focus-visible {
   }
 }
 
-@keyframes currentTurnRowPulse {
+@keyframes activePlayerColumnPulse {
   0%, 100% {
     box-shadow:
-      inset 0 1px 0 color-mix(in srgb, var(--accent, #8ab4ff) 62%, transparent),
-      inset 0 -1px 0 color-mix(in srgb, var(--accent, #8ab4ff) 50%, transparent),
-      0 0 22px color-mix(in srgb, var(--accent, #8ab4ff) 20%, transparent);
+      inset 0 0 32px color-mix(in srgb, var(--accent, #8ab4ff) 28%, transparent),
+      4px 0 22px color-mix(in srgb, var(--accent, #8ab4ff) 26%, transparent);
   }
 
   50% {
     box-shadow:
-      inset 0 1px 0 color-mix(in srgb, var(--accent, #8ab4ff) 92%, rgba(255, 255, 255, 0.22)),
-      inset 0 -1px 0 color-mix(in srgb, var(--accent, #8ab4ff) 80%, transparent),
-      0 0 44px color-mix(in srgb, var(--accent, #8ab4ff) 38%, transparent);
+      inset 0 0 54px color-mix(in srgb, var(--accent, #8ab4ff) 50%, transparent),
+      4px 0 40px color-mix(in srgb, var(--accent, #8ab4ff) 48%, transparent);
   }
 }
 
@@ -3471,21 +3495,20 @@ button:focus-visible {
   grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
-.players-table tbody tr.current-turn-row > td {
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--accent, #8ab4ff) 36%, transparent), transparent 70%),
-    rgba(255, 255, 255, 0.068);
+.players-table tbody tr.current-turn-row > td.players-table-cell {
+  background: rgba(255, 255, 255, 0.05);
   box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--accent, #8ab4ff) 28%, transparent),
-    inset 0 -1px 0 color-mix(in srgb, var(--accent, #8ab4ff) 18%, transparent);
-  animation: currentTurnRowPulse 2.2s ease-in-out infinite;
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.04);
 }
 
-.players-table tbody tr.current-turn-row > td:first-child {
-  border-left: 4px solid color-mix(in srgb, var(--accent, #8ab4ff) 92%, rgba(255, 255, 255, 0.3));
-  box-shadow:
-    inset 4px 0 12px color-mix(in srgb, var(--accent, #8ab4ff) 28%, transparent),
-    0 0 36px color-mix(in srgb, var(--accent, #8ab4ff) 36%, transparent);
+.players-table tbody tr.current-turn-row .players-table-player {
+  background:
+    linear-gradient(160deg,
+      color-mix(in srgb, var(--accent, #8ab4ff) 46%, rgba(4, 5, 9, 0.86)),
+      rgba(4, 5, 9, 0.90));
+  border-left: 4px solid color-mix(in srgb, var(--accent, #8ab4ff) 96%, rgba(255, 255, 255, 0.28));
+  animation: activePlayerColumnPulse 2.2s ease-in-out infinite;
 }
 
 .table-current-turn-badge {
