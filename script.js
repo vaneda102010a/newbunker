@@ -1644,12 +1644,20 @@ function createDrawState() {
   };
 }
 
+function isRemovedAbilityCard(cardText) {
+  const text = cleanText(cardText, "").toLowerCase().replaceAll("ё", "е");
+  const targetsAbilityTrait = text.includes("способност") || text.includes("abilit");
+  const isExchangeAction = includesAny(text, ["обменять", "обменяться", "swap", "exchange"]);
+  return targetsAbilityTrait && isExchangeAction;
+}
+
 function drawCard(section, drawState, excluded = new Set()) {
   // sanitize card list: remove empty or whitespace-only entries
   const rawCards = cardDatabase[section] || [];
   const cards = rawCards.filter((c) => {
     try {
-      return String(c).trim().length > 0;
+      const card = String(c).trim();
+      return card.length > 0 && (section !== cardSections.specialAbility || !isRemovedAbilityCard(card));
     } catch (e) {
       return false;
     }
@@ -1888,6 +1896,7 @@ function renderCharacters(characters) {
     card.innerHTML = `
       <span class="number-badge">${character.number}</span>
       ${isOwn ? `<span class="own-card-badge">${escapeHtml(getOwnCardBadgeText())}</span>` : ""}
+      ${isTurn ? `<span class="current-turn-badge card-current-turn-badge">NOW PLAYING</span>` : ""}
       <img class="portrait" src="${createPlaceholderImage(character)}" alt="Игрок ${character.number}">
       <div class="card-body">
         <h3 class="profession">${renderCardTitle(character)}</h3>
@@ -1965,7 +1974,7 @@ function renderPlayerTableRow(character, gameIsOver, visibleTableTraits = tableT
 
   return `
     <tr class="${isExcluded ? "excluded" : ""}${isOwn ? " own-row" : ""}${isTurn ? " current-turn-row" : ""}" style="--accent: ${character.accent}" data-player="${character.number}">
-      <td class="players-table-player" title="${escapeHtml(playerTitle)}">${renderPlayerTableSlot(character, isExcluded, gameIsOver)}</td>
+      <td class="players-table-player" title="${escapeHtml(playerTitle)}">${renderPlayerTableSlot(character, isExcluded, gameIsOver, isTurn)}</td>
       ${visibleTableTraits.map((trait, columnIndex) => {
         return `
           <td class="players-table-cell trait-${trait.key}${isNewlyRevealedTrait(character.number, trait.key) ? " revealed-now-cell" : ""}" data-column="${columnIndex + 1}" title="${escapeHtml(getTableTraitTitle(character, trait))}">
@@ -2012,7 +2021,7 @@ function getTableTraitLabel(trait) {
   return trait.label;
 }
 
-function renderPlayerTableSlot(character, isExcluded, gameIsOver) {
+function renderPlayerTableSlot(character, isExcluded, gameIsOver, isTurn = false) {
   const slotPlayer = getRoomPlayerForSlot(character.number);
   const isOwn = isOwnPlayer(character.number);
   const playerName = slotPlayer?.name || (isOwn && currentPlayerName) || `Игрок ${character.number}`;
@@ -2024,6 +2033,7 @@ function renderPlayerTableSlot(character, isExcluded, gameIsOver) {
       <div class="players-table-player-main">
         <span class="players-table-player-name">${escapeHtml(playerName)}</span>
         <span class="players-table-slot-status ${statusClass}">${statusText}</span>
+        ${isTurn ? `<span class="current-turn-badge table-current-turn-badge">NOW PLAYING</span>` : ""}
       </div>
       ${isHostView() ? `
         <div class="players-table-host-actions">
@@ -2211,12 +2221,14 @@ function renderAbilitiesPanelCard(character) {
   const playerName = getTablePlayerTitle(character);
   const abilityItems = getPlayerAbilityItems(character);
   const isOwn = isOwnPlayer(character.number);
+  const isTurn = isCurrentTurnPlayer(character.number);
 
   return `
-    <article class="ability-player-card${isOwn ? " own-ability-card" : ""}" style="--accent: ${character.accent}" data-player="${character.number}">
+    <article class="ability-player-card${isOwn ? " own-ability-card" : ""}${isTurn ? " current-turn-card" : ""}" style="--accent: ${character.accent}" data-player="${character.number}">
       <header class="ability-player-header">
         <span class="ability-player-number">${character.number}</span>
         <h3>${escapeHtml(playerName)}</h3>
+        ${isTurn ? `<span class="current-turn-badge ability-current-turn-badge">NOW PLAYING</span>` : ""}
       </header>
       <div class="ability-player-list">
         ${abilityItems.map((ability) => renderAbilityPanelRow(character.number, ability)).join("")}
@@ -2300,15 +2312,16 @@ function normalizeTraitText(value) {
 }
 
 function renderSpecialAbilities(character) {
-  const abilities = getPlayerAbilities(character);
+  const abilityItems = getPlayerAbilityItems(character);
+  const visibleAbilities = abilityItems.filter((ability) => ability.name);
 
-  if (abilities.length === 0) {
+  if (visibleAbilities.length === 0) {
     return `<span class="trait-value">Не указано</span>`;
   }
 
   // Ensure we always render two slots (top and bottom).
-  const slot0 = abilities[0] || "";
-  const slot1 = abilities[1] || "";
+  const slot0 = abilityItems[0]?.name || "";
+  const slot1 = abilityItems[1]?.name || "";
 
   const used0 = Boolean(usedAbilities[`${character.number}:0`]);
   const used1 = Boolean(usedAbilities[`${character.number}:1`]);
@@ -2457,8 +2470,7 @@ function getAbilityTraitGenitiveLabel(traitKey) {
     health: "здоровья",
     phobia: "фобии",
     largeInventory: "инвентаря",
-    backpack: "рюкзака",
-    specialAbility: "способности"
+    backpack: "рюкзака"
   };
 
   return labels[traitKey] || "карты";
@@ -2573,8 +2585,8 @@ function getPlayerAbilities(player) {
   const first = cleanText(player?.specialAbility, "").trim();
   const second = cleanText(player?.specialAbility2, "").trim();
   const list = [];
-  if (first) list.push(first);
-  if (second) list.push(second);
+  if (first && !isRemovedAbilityCard(first)) list.push(first);
+  if (second && !isRemovedAbilityCard(second)) list.push(second);
   return list;
 }
 
@@ -2587,7 +2599,8 @@ function getPlayerAbilityItems(player) {
 
   return [player?.specialAbility, player?.specialAbility2].map((rawAbility, index) => {
     const id = getAbilityKey(playerNumber, index);
-    const name = cleanText(rawAbility, "").trim();
+    const rawName = cleanText(rawAbility, "").trim();
+    const name = isRemovedAbilityCard(rawName) ? "" : rawName;
     const analysis = analyzeAbility(name, playerNumber);
 
     return {
@@ -2814,10 +2827,6 @@ function inferTraitKey(lowerText) {
 
   if (lowerText.includes("инфо") || lowerText.includes("информац")) {
     return "additionalInfo";
-  }
-
-  if (lowerText.includes("способност") || lowerText.includes("спец.")) {
-    return "specialAbility";
   }
 
   return "";
@@ -3585,21 +3594,6 @@ function applySwapAbility(context) {
 
   if (!actor || !target || !traitKey) {
     addGameLog(`Обмен Игрока ${context.actorNumber} требует ручного применения`);
-    return;
-  }
-
-  if (traitKey === "specialAbility") {
-    const actorWasRevealed = isTraitRevealed(actor.number, traitKey);
-    const targetWasRevealed = isTraitRevealed(target.number, traitKey);
-    const actorFirst = actor.specialAbility;
-    const actorSecond = actor.specialAbility2;
-    actor.specialAbility = target.specialAbility;
-    actor.specialAbility2 = target.specialAbility2;
-    target.specialAbility = actorFirst;
-    target.specialAbility2 = actorSecond;
-    setTraitVisibilityState(actor.number, traitKey, actorWasRevealed);
-    setTraitVisibilityState(target.number, traitKey, targetWasRevealed);
-    addGameLog(`Игрок ${context.actorNumber} обменялся способностями с Игроком ${context.targetNumber}`);
     return;
   }
 

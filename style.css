@@ -3346,3 +3346,144 @@ button:focus-visible {
     inset 0 0 0 1px color-mix(in srgb, var(--accent, #8ab4ff) 20%, transparent),
     0 0 18px color-mix(in srgb, var(--accent, #8ab4ff) 12%, transparent);
 }
+
+@keyframes currentTurnGlow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--accent, #8ab4ff) 68%, rgba(255, 255, 255, 0.16)),
+      0 0 24px color-mix(in srgb, var(--accent, #8ab4ff) 34%, transparent),
+      0 18px 44px rgba(0, 0, 0, 0.42);
+  }
+
+  50% {
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--accent, #8ab4ff) 86%, rgba(255, 255, 255, 0.28)),
+      0 0 38px color-mix(in srgb, var(--accent, #8ab4ff) 48%, transparent),
+      0 22px 54px rgba(0, 0, 0, 0.46);
+  }
+}
+
+@keyframes currentTurnBorder {
+  0% {
+    background-position: 0% 50%;
+    opacity: 0.74;
+  }
+
+  50% {
+    background-position: 100% 50%;
+    opacity: 1;
+  }
+
+  100% {
+    background-position: 0% 50%;
+    opacity: 0.74;
+  }
+}
+
+@keyframes currentTurnRowPulse {
+  0%, 100% {
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--accent, #8ab4ff) 58%, transparent),
+      inset 0 -1px 0 color-mix(in srgb, var(--accent, #8ab4ff) 46%, transparent),
+      0 0 20px color-mix(in srgb, var(--accent, #8ab4ff) 18%, transparent);
+  }
+
+  50% {
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--accent, #8ab4ff) 86%, rgba(255, 255, 255, 0.18)),
+      inset 0 -1px 0 color-mix(in srgb, var(--accent, #8ab4ff) 72%, transparent),
+      0 0 34px color-mix(in srgb, var(--accent, #8ab4ff) 28%, transparent);
+  }
+}
+
+.current-turn-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--accent, #8ab4ff) 62%, rgba(255, 255, 255, 0.18));
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent, #8ab4ff) 34%, rgba(255, 255, 255, 0.08)), rgba(255, 255, 255, 0.08));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent, #8ab4ff) 18%, transparent),
+    0 0 16px color-mix(in srgb, var(--accent, #8ab4ff) 28%, transparent);
+  color: rgba(255, 255, 255, 0.96);
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.character-card.current-turn-card,
+.ability-player-card.current-turn-card {
+  border-color: color-mix(in srgb, var(--accent, #8ab4ff) 74%, rgba(255, 255, 255, 0.26));
+  animation: currentTurnGlow 2.4s ease-in-out infinite;
+}
+
+.character-card.current-turn-card::after,
+.ability-player-card.current-turn-card::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  z-index: 1;
+  border: 2px solid transparent;
+  border-radius: inherit;
+  background:
+    linear-gradient(110deg, transparent, color-mix(in srgb, var(--accent, #8ab4ff) 74%, #ffffff), transparent, var(--accent, #8ab4ff)) border-box;
+  background-size: 240% 240%;
+  mask:
+    linear-gradient(#000 0 0) padding-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  -webkit-mask:
+    linear-gradient(#000 0 0) padding-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  pointer-events: none;
+  animation: currentTurnBorder 3s ease-in-out infinite;
+}
+
+.character-card.current-turn-card > *,
+.ability-player-card.current-turn-card > * {
+  position: relative;
+  z-index: 2;
+}
+
+.card-current-turn-badge {
+  position: absolute;
+  z-index: 3;
+  top: 52px;
+  left: 14px;
+}
+
+.ability-current-turn-badge {
+  justify-self: end;
+  align-self: center;
+}
+
+.ability-player-card.current-turn-card .ability-player-header {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.players-table tbody tr.current-turn-row > td {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent, #8ab4ff) 28%, transparent), transparent 78%),
+    rgba(255, 255, 255, 0.052);
+  animation: currentTurnRowPulse 2.2s ease-in-out infinite;
+}
+
+.players-table tbody tr.current-turn-row > td:first-child {
+  border-left: 3px solid color-mix(in srgb, var(--accent, #8ab4ff) 90%, rgba(255, 255, 255, 0.3));
+  box-shadow:
+    inset 3px 0 0 color-mix(in srgb, var(--accent, #8ab4ff) 92%, transparent),
+    0 0 28px color-mix(in srgb, var(--accent, #8ab4ff) 30%, transparent);
+}
+
+.table-current-turn-badge {
+  margin-top: 2px;
+}
