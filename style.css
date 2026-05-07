@@ -2480,7 +2480,7 @@ button:focus-visible {
 .players-table thead th {
   text-transform: uppercase;
   letter-spacing: 0.8px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 900;
   color: rgba(148, 184, 255, 0.72);
   border-bottom: 2px solid rgba(148, 184, 255, 0.2);
@@ -2499,7 +2499,7 @@ button:focus-visible {
 
 /* Player name — bold white */
 .players-table-player-name {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 800;
   color: #fff;
   letter-spacing: -0.1px;
@@ -2507,7 +2507,7 @@ button:focus-visible {
 
 /* Number column — accent glow */
 .players-table-number {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 900;
   text-shadow: 0 0 18px color-mix(in srgb, var(--accent, #8ab4ff) 70%, transparent);
 }
@@ -3193,7 +3193,7 @@ button:focus-visible {
   width: 100%;
   min-width: 0;
   table-layout: fixed;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.3;
 }
 
@@ -3202,7 +3202,7 @@ button:focus-visible {
 .players-table td {
   padding: 5px 6px;
   min-width: 0;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.3;
   white-space: normal;
   overflow-wrap: break-word;
@@ -3275,13 +3275,13 @@ button:focus-visible {
   -webkit-box-orient: vertical;
   overflow: hidden;
   white-space: normal;
-  font-size: 10px;
+  font-size: 12px;
   max-width: 100%;
 }
 
 /* Player name: 2-line clamp */
 .players-table-player-name {
-  font-size: 12px;
+  font-size: 14px;
   white-space: normal;
   overflow-wrap: break-word;
   word-break: break-word;
