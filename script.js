@@ -468,6 +468,38 @@ function savePlayerName(playerName) {
   }
 }
 
+function getRoomPlayerStorageKey(roomCode) {
+  const normalizedCode = normalizeStartRoomCode(roomCode);
+  return normalizedCode ? `bunker_player_${normalizedCode}` : "";
+}
+
+function getSavedRoomPlayerId(roomCode) {
+  const storageKey = getRoomPlayerStorageKey(roomCode);
+  if (!storageKey) {
+    return "";
+  }
+
+  try {
+    return localStorage.getItem(storageKey) || "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function saveRoomPlayerId(roomCode, playerId) {
+  const storageKey = getRoomPlayerStorageKey(roomCode);
+  const cleanedId = cleanText(playerId, "").trim();
+  if (!storageKey || !cleanedId) {
+    return;
+  }
+
+  try {
+    localStorage.setItem(storageKey, cleanedId);
+  } catch (error) {
+    // localStorage can be unavailable in private or restricted contexts.
+  }
+}
+
 function syncStartPlayerName(playerName) {
   const cleanedName = cleanText(playerName, "").trim();
 
@@ -1070,7 +1102,11 @@ function joinOnlineRoom() {
     return;
   }
 
-  socket.emit("join-room", { roomCode, name: getRoomPlayerName() }, handleRoomReply);
+  socket.emit("join-room", {
+    roomCode,
+    name: getRoomPlayerName(),
+    playerId: getSavedRoomPlayerId(roomCode)
+  }, handleRoomReply);
 }
 
 function handleRoomReply(response) {
@@ -1083,39 +1119,35 @@ function handleRoomReply(response) {
   currentRoomCode = response.roomCode;
   if (response.playerId) {
     localPlayerId = response.playerId;
-    try { localStorage.setItem(`bunker_player_${currentRoomCode}`, localPlayerId); } catch (e) {}
+    saveRoomPlayerId(currentRoomCode, localPlayerId);
   }
   savePlayerName(getRoomPlayerName());
   showGameShell();
   setStartStatus("", "");
   setStatus(`Комната ${currentRoomCode} подключена.`, "success");
-  // Try to join/reconnect to lobby using persistent playerId
-  try {
-    const saved = localStorage.getItem(`bunker_player_${currentRoomCode}`);
-    if (saved) {
-      localPlayerId = saved;
-      socket.emit("reconnect-lobby", { roomCode: currentRoomCode, playerId: localPlayerId }, (res) => {
-        if (!res?.ok) {
-          // fallback to join
-          socket.emit("join-lobby", { roomCode: currentRoomCode, playerName: getRoomPlayerName() }, (r2) => {
-            if (r2?.ok) {
-              localPlayerId = r2.playerId;
-              try { localStorage.setItem(`bunker_player_${currentRoomCode}`, localPlayerId); } catch (e) {}
-            }
-          });
-        }
-      });
-    } else {
-      socket.emit("join-lobby", { roomCode: currentRoomCode, playerName: getRoomPlayerName() }, (r2) => {
-        if (r2?.ok) {
-          localPlayerId = r2.playerId;
-          try { localStorage.setItem(`bunker_player_${currentRoomCode}`, localPlayerId); } catch (e) {}
-        }
-      });
-    }
-  } catch (err) {
-    // ignore localStorage errors
+}
+
+function renderLobbyPlayerList(lobby) {
+  if (!roomPlayersList || !lobby) {
+    return;
   }
+
+  roomPlayersList.innerHTML = (lobby.players || [])
+    .map((p) => {
+      const name = escapeHtml(p.name || "Игрок");
+      const number = Number(p.playerNumber) || null;
+      const roleLabel = p.isHost ? "Ведущий" : `Игрок ${number || "-"}`;
+      const isCurrent = lobby.currentPlayerId && lobby.currentPlayerId === p.id;
+      const offlineLabel = !p.isConnected ? " · Offline" : "";
+      const stateLabel = p.isExcluded ? " · выбыл" : isCurrent ? " · ход" : "";
+      let kickButton = "";
+      if (localPlayerId && lobby.hostId === localPlayerId && p.id !== localPlayerId) {
+        kickButton = ` <button class="kick-button" data-player-id="${p.id}" data-socket-id="${p.socketId || ''}">Кик</button>`;
+      }
+
+      return `<li${isCurrent ? ' class="current-turn"' : ''}><span>${name}</span> <strong>${roleLabel}${offlineLabel}${stateLabel}</strong>${kickButton}</li>`;
+    })
+    .join("");
 }
 
 function applyLobbyState(lobby) {
@@ -1123,22 +1155,7 @@ function applyLobbyState(lobby) {
   currentLobby = lobby;
   currentRoomCode = lobby.roomCode || currentRoomCode;
 
-  // Render players with kick buttons for host
-  roomPlayersList.innerHTML = (lobby.players || [])
-    .map((p) => {
-      const name = escapeHtml(p.name || "Игрок");
-      const number = Number(p.playerNumber) || null;
-      const roleLabel = p.isHost ? "Ведущий" : `Игрок ${number || "-"}`;
-      const isCurrent = lobby.currentPlayerId && lobby.currentPlayerId === p.id;
-      const stateLabel = p.isExcluded ? " · выбыл" : isCurrent ? " · ход" : "";
-      let kickButton = "";
-      if (localPlayerId && lobby.hostId === localPlayerId && p.id !== localPlayerId) {
-        kickButton = ` <button class="kick-button" data-player-id="${p.id}" data-socket-id="${p.socketId || ''}">Кик</button>`;
-      }
-
-      return `<li${isCurrent ? ' class="current-turn"' : ''}><span>${name}</span> <strong>${roleLabel}${stateLabel}</strong>${kickButton}</li>`;
-    })
-    .join("");
+  renderLobbyPlayerList(lobby);
 
   // Show start button only for host and while waiting
   if (startGameButton) {
@@ -1249,8 +1266,10 @@ function isCharacterActive(characterNumber) {
   if (!currentPlayerId) return false;
   const lobbyPlayer = (currentLobby.players || []).find((p) => p.id === currentPlayerId);
   if (!lobbyPlayer) return false;
-  // find corresponding room player by socketId
-  const slotPlayer = roomPlayers.find((rp) => rp.socketId === lobbyPlayer.socketId);
+  const slotPlayer = roomPlayers.find((rp) => (
+    (rp.playerId && rp.playerId === lobbyPlayer.id) ||
+    rp.socketId === lobbyPlayer.socketId
+  ));
   if (!slotPlayer) return false;
   return Number(slotPlayer.playerNumber) === Number(characterNumber);
 }
@@ -1263,8 +1282,9 @@ roomPlayersList?.addEventListener("click", (e) => {
   const targetSocketId = btn.getAttribute("data-socket-id");
   if ((!playerId && !targetSocketId) || !currentRoomCode) return;
   if (!confirm("Исключить этого игрока?")) return;
-  // Prefer kicking by socketId when available (admin API expects targetSocketId)
-  const payload = targetSocketId ? { roomCode: currentRoomCode, targetSocketId } : { roomCode: currentRoomCode, playerId };
+  const payload = playerId
+    ? { roomCode: currentRoomCode, playerId }
+    : { roomCode: currentRoomCode, targetSocketId };
   socket.emit("kickPlayer", payload, (res) => {
     if (!res?.ok) {
       alert(res?.error || "Не удалось кикнуть игрока");
@@ -1296,6 +1316,10 @@ function applyRoomState({ room, currentUser }) {
   currentSocketId = socket?.id || currentUser.socketId || currentSocketId;
   roomPlayers = room.players || [];
   appRole = currentUser.isHost ? ROLE_HOST : ROLE_PLAYER;
+  if (currentUser.playerId) {
+    localPlayerId = currentUser.playerId;
+    saveRoomPlayerId(currentRoomCode, localPlayerId);
+  }
   currentPlayerNumber = Number(currentUser.playerNumber) || 0;
   currentPlayerName = currentUser.name || "";
   revealedTraits = room.revealedTraits || {};
@@ -1334,6 +1358,11 @@ function renderRoomInfo(room) {
   const inviteUrl = `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(room.roomCode)}`;
   roomInviteLink.href = inviteUrl;
   roomInviteLink.textContent = inviteUrl;
+
+  if (currentLobby?.roomCode === room.roomCode) {
+    renderLobbyPlayerList(currentLobby);
+    return;
+  }
 
   roomPlayersList.innerHTML = (room.players || [])
     .map((player) => {

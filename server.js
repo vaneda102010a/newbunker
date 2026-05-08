@@ -94,12 +94,45 @@ function getLobbyPlayerBySocketId(lobby, socketId) {
   return lobby?.players?.find(p => p.socketId === socketId);
 }
 
+function getNameKey(name) {
+  return cleanName(name).toLocaleLowerCase();
+}
+
+function getDisconnectedLobbyPlayerByName(lobby, name) {
+  const nameKey = getNameKey(name);
+  if (!lobby || !nameKey) {
+    return null;
+  }
+
+  return lobby.players.find((player) => !player.isConnected && getNameKey(player.name) === nameKey) || null;
+}
+
+function getRoomPlayerByPlayerId(room, playerId) {
+  if (!room || !playerId) {
+    return null;
+  }
+
+  return room.players.find((player) => player.playerId === playerId) || null;
+}
+
+function getRoomPlayerByDisconnectedName(room, name) {
+  const nameKey = getNameKey(name);
+  if (!room || !nameKey) {
+    return null;
+  }
+
+  return room.players.find((player) => !player.connected && getNameKey(player.name) === nameKey) || null;
+}
+
 function getLobbyPlayerForRoomPlayer(lobby, roomPlayer) {
   if (!lobby || !roomPlayer) {
     return null;
   }
 
-  return lobby.players.find((player) => player.socketId === roomPlayer.socketId) || null;
+  return lobby.players.find((player) => (
+    (roomPlayer.playerId && player.id === roomPlayer.playerId) ||
+    player.socketId === roomPlayer.socketId
+  )) || null;
 }
 
 function getActiveTurnEntries(lobby, room) {
@@ -168,6 +201,9 @@ function ensureTurnStateStarted(lobby, room) {
 
 function serializeLobby(lobby, room = rooms.get(normalizeRoomCode(lobby?.roomCode))) {
   const currentEntry = ensureTurnStateStarted(lobby, room);
+  const roomPlayersByPlayerId = new Map((room?.players || [])
+    .filter((player) => player.playerId)
+    .map((player) => [player.playerId, player]));
   const roomPlayersBySocket = new Map((room?.players || []).map((player) => [player.socketId, player]));
   
   return {
@@ -181,18 +217,23 @@ function serializeLobby(lobby, room = rooms.get(normalizeRoomCode(lobby?.roomCod
     isGameStarted: Boolean(lobby.isGameStarted),
     currentTurnStartedAt: lobby.currentTurnStartedAt,
     currentPlayerId: currentEntry?.lobbyPlayer?.id || null,
-    players: lobby.players.map(p => ({
-      id: p.id,
-      socketId: p.socketId,
-      name: p.name,
-      isHost: p.isHost,
-      isConnected: p.isConnected,
-      hasRevealedThisTurn: p.hasRevealedThisTurn,
-      playerNumber: Number(roomPlayersBySocket.get(p.socketId)?.playerNumber) || null,
-      isExcluded: roomPlayersBySocket.has(p.socketId)
-        ? (room?.excludedPlayers || []).map(Number).includes(Number(roomPlayersBySocket.get(p.socketId)?.playerNumber))
-        : false
-    }))
+    players: lobby.players.map(p => {
+      const roomPlayer = roomPlayersByPlayerId.get(p.id) || roomPlayersBySocket.get(p.socketId) || null;
+      const playerNumber = Number(roomPlayer?.playerNumber) || null;
+
+      return {
+        id: p.id,
+        socketId: p.socketId,
+        name: p.name,
+        isHost: p.isHost,
+        isConnected: p.isConnected,
+        hasRevealedThisTurn: p.hasRevealedThisTurn,
+        playerNumber,
+        isExcluded: playerNumber
+          ? (room?.excludedPlayers || []).map(Number).includes(playerNumber)
+          : false
+      };
+    })
   };
 }
 
@@ -341,7 +382,7 @@ io.on("connection", (socket) => {
   // LOBBY EVENTS
   // ============================================
   
-  socket.on("join-lobby", ({ roomCode, playerName } = {}, reply) => {
+  socket.on("join-lobby", ({ roomCode, playerName, playerId } = {}, reply) => {
     const normalizedCode = normalizeRoomCode(roomCode);
     const room = rooms.get(normalizedCode);
     
@@ -358,10 +399,15 @@ io.on("connection", (socket) => {
     
     const cleanedName = cleanName(playerName) || `Игрок ${lobby.players.length + 1}`;
 
-    const existingLobbyPlayer = getLobbyPlayerBySocketId(lobby, socket.id);
+    const existingLobbyPlayer =
+      getLobbyPlayer(lobby, playerId) ||
+      getLobbyPlayerBySocketId(lobby, socket.id) ||
+      getDisconnectedLobbyPlayerByName(lobby, cleanedName);
     if (existingLobbyPlayer) {
       existingLobbyPlayer.name = cleanedName || existingLobbyPlayer.name;
+      existingLobbyPlayer.socketId = socket.id;
       existingLobbyPlayer.isConnected = true;
+      connectLobbyPlayerToRoom(room, existingLobbyPlayer, socket, existingLobbyPlayer.name);
       socket.join(normalizedCode);
       sendReply(reply, { ok: true, playerId: existingLobbyPlayer.id, roomCode: normalizedCode });
       broadcastLobby(normalizedCode);
@@ -370,9 +416,9 @@ io.on("connection", (socket) => {
     }
     
     // Create new player for lobby
-    const playerId = createPlayerId();
+    const newPlayerId = createPlayerId();
     const newPlayer = {
-      id: playerId,
+      id: newPlayerId,
       socketId: socket.id,
       name: cleanedName,
       isHost: lobby.players.length === 0, // First player is host
@@ -381,17 +427,18 @@ io.on("connection", (socket) => {
     };
     
     if (newPlayer.isHost) {
-      lobby.hostId = playerId;
+      lobby.hostId = newPlayerId;
     }
     
     lobby.players.push(newPlayer);
+    connectLobbyPlayerToRoom(room, newPlayer, socket, cleanedName);
     
     // Also add to room for socket.io routing
     socket.join(normalizedCode);
     
-    console.log(`Player ${cleanedName} (${playerId}) joined lobby ${normalizedCode}`);
+    console.log(`Player ${cleanedName} (${newPlayerId}) joined lobby ${normalizedCode}`);
     
-    sendReply(reply, { ok: true, playerId, roomCode: normalizedCode });
+    sendReply(reply, { ok: true, playerId: newPlayerId, roomCode: normalizedCode });
     broadcastLobby(normalizedCode);
     broadcastRoom(normalizedCode);
   });
@@ -416,6 +463,7 @@ io.on("connection", (socket) => {
     // Update player connection
     player.socketId = socket.id;
     player.isConnected = true;
+    connectLobbyPlayerToRoom(room, player, socket, player.name);
     
     // Join room socket
     socket.join(normalizedCode);
@@ -501,6 +549,11 @@ io.on("connection", (socket) => {
       return;
     }
     
+    if (playerToKick.id === hostPlayer.id || playerToKick.isHost) {
+      sendReply(reply, { ok: false, error: "Cannot kick the host" });
+      return;
+    }
+
     // Remove player from lobby
     const removedIndex = lobby.players.findIndex(p => p.id === playerId);
     const removedPlayer = removedIndex !== -1 ? lobby.players[removedIndex] : null;
@@ -508,9 +561,12 @@ io.on("connection", (socket) => {
 
     // Also remove from room.players if present
     const roomObj = rooms.get(normalizeRoomCode(normalizedCode));
-    const removedRoomPlayer = roomObj?.players?.find((rp) => rp.socketId === playerToKick.socketId) || null;
+    const removedRoomPlayer =
+      getRoomPlayerByPlayerId(roomObj, playerToKick.id) ||
+      roomObj?.players?.find((rp) => rp.socketId === playerToKick.socketId) ||
+      null;
     if (roomObj) {
-      roomObj.players = roomObj.players.filter(rp => rp.socketId !== playerToKick.socketId);
+      roomObj.players = roomObj.players.filter((rp) => rp.playerId !== playerToKick.id && rp.socketId !== playerToKick.socketId);
     }
 
     // If removed player was current, advance turn
@@ -546,6 +602,11 @@ io.on("connection", (socket) => {
 
     if (!playerToKick) {
       sendReply(reply, { ok: false, error: "Игрок не найден" });
+      return;
+    }
+
+    if (playerToKick.id === hostPlayer.id || playerToKick.isHost) {
+      sendReply(reply, { ok: false, error: "Cannot kick the host" });
       return;
     }
 
@@ -793,7 +854,7 @@ io.on("connection", (socket) => {
     createRoomForSocket(socket, name, reply);
   });
 
-  socket.on("join-room", ({ roomCode, name } = {}, reply) => {
+  socket.on("join-room", ({ roomCode, name, playerId } = {}, reply) => {
     const normalizedCode = normalizeRoomCode(roomCode);
     const room = rooms.get(normalizedCode);
 
@@ -802,42 +863,44 @@ io.on("connection", (socket) => {
       return;
     }
 
-    const existingPlayer = room.players.find((player) => player.socketId === socket.id);
-    if (existingPlayer) {
-      existingPlayer.name = cleanName(name) || existingPlayer.name;
-      socket.join(normalizedCode);
-      sendReply(reply, { ok: true, roomCode: normalizedCode });
-      broadcastRoom(normalizedCode);
-      broadcastLobby(normalizedCode);
-      return;
-    }
-
     const playerName = cleanName(name) || `Игрок ${room.players.length + 1}`;
-    room.players.push({
-      socketId: socket.id,
-      name: playerName,
-      playerNumber: assignPlayerNumber(room),
-      isHost: false,
-      connected: true
-    });
     room.gameLog.push(`${playerName} присоединился к комнате`);
     
-    // Also add to lobby
     const lobby = createOrGetLobby(normalizedCode);
-    if (!getLobbyPlayerBySocketId(lobby, socket.id)) {
-      const playerId = createPlayerId();
-      lobby.players.push({
-        id: playerId,
+    let lobbyPlayer =
+      getLobbyPlayer(lobby, playerId) ||
+      getLobbyPlayerBySocketId(lobby, socket.id) ||
+      getDisconnectedLobbyPlayerByName(lobby, playerName);
+    const isReconnect = Boolean(lobbyPlayer);
+
+    if (!lobbyPlayer) {
+      lobbyPlayer = {
+        id: createPlayerId(),
         socketId: socket.id,
         name: playerName,
         isHost: false,
         isConnected: true,
         hasRevealedThisTurn: false
-      });
+      };
+      lobby.players.push(lobbyPlayer);
+    }
+
+    lobbyPlayer.socketId = socket.id;
+    lobbyPlayer.name = playerName || lobbyPlayer.name;
+    lobbyPlayer.isConnected = true;
+
+    const roomPlayer = connectLobbyPlayerToRoom(room, lobbyPlayer, socket, lobbyPlayer.name);
+    if (isReconnect) {
+      room.gameLog.pop();
     }
     
     socket.join(normalizedCode);
-    sendReply(reply, { ok: true, roomCode: normalizedCode });
+    sendReply(reply, {
+      ok: true,
+      roomCode: normalizedCode,
+      playerId: lobbyPlayer.id,
+      playerNumber: roomPlayer?.playerNumber || null
+    });
     broadcastRoom(normalizedCode);
     broadcastLobby(normalizedCode);
   });
@@ -1240,12 +1303,12 @@ io.on("connection", (socket) => {
 function createRoomForSocket(socket, rawPlayerName, reply) {
   const roomCode = generateRoomCode();
   const playerName = cleanName(rawPlayerName) || "Ведущий";
-  const room = createRoom(roomCode, socket.id, playerName);
+  const playerId = createPlayerId();
+  const room = createRoom(roomCode, socket.id, playerName, playerId);
   rooms.set(roomCode, room);
   
   // Create associated lobby
   const lobby = createOrGetLobby(roomCode);
-  const playerId = createPlayerId();
   lobby.players.push({
     id: playerId,
     socketId: socket.id,
@@ -1266,11 +1329,11 @@ function createRoomForSocket(socket, rawPlayerName, reply) {
   broadcastLobby(roomCode);
 }
 
-function createRoom(roomCode, hostId, hostName) {
+function createRoom(roomCode, hostId, hostName, hostPlayerId) {
   return {
     roomCode,
     hostId,
-    players: [{ socketId: hostId, name: hostName, playerNumber: 1, isHost: true, connected: true }],
+    players: [{ playerId: hostPlayerId, socketId: hostId, name: hostName, playerNumber: 1, isHost: true, connected: true }],
     generatedPack: null,
     revealedTraits: {},
     excludedPlayers: [],
@@ -1321,6 +1384,52 @@ function getHostRoom(socket, roomCode) {
 
 function getRoomPlayer(room, socketId) {
   return room?.players?.find((player) => player.socketId === socketId) || null;
+}
+
+function connectLobbyPlayerToRoom(room, lobbyPlayer, socket, playerName) {
+  if (!room || !lobbyPlayer || !socket) {
+    return null;
+  }
+
+  let roomPlayer =
+    getRoomPlayerByPlayerId(room, lobbyPlayer.id) ||
+    getRoomPlayer(room, socket.id) ||
+    getRoomPlayerByDisconnectedName(room, playerName);
+
+  if (!roomPlayer) {
+    roomPlayer = {
+      playerId: lobbyPlayer.id,
+      socketId: socket.id,
+      name: playerName,
+      playerNumber: lobbyPlayer.isHost ? 1 : assignPlayerNumber(room),
+      isHost: Boolean(lobbyPlayer.isHost),
+      connected: true
+    };
+    room.players.push(roomPlayer);
+  }
+
+  roomPlayer.playerId = lobbyPlayer.id;
+  roomPlayer.socketId = socket.id;
+  roomPlayer.name = playerName || roomPlayer.name;
+  roomPlayer.isHost = Boolean(roomPlayer.isHost || lobbyPlayer.isHost);
+  roomPlayer.connected = true;
+
+  if (roomPlayer.isHost || lobbyPlayer.isHost) {
+    roomPlayer.isHost = true;
+    lobbyPlayer.isHost = true;
+    room.hostId = socket.id;
+  }
+
+  const roomPlayerNameKey = getNameKey(roomPlayer.name);
+  room.players = room.players.filter((player) => (
+    player === roomPlayer ||
+    (
+      player.playerId !== lobbyPlayer.id &&
+      (player.connected || !roomPlayerNameKey || getNameKey(player.name) !== roomPlayerNameKey)
+    )
+  ));
+
+  return roomPlayer;
 }
 
 function canReveal(player, playerNumber) {
